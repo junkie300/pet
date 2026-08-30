@@ -1,0 +1,48 @@
+name: etl
+
+# 1단계(동물병원)에서 활성화한다. 지금은 수동 실행만 가능하도록 두었다.
+#
+# LOCALDATA 는 월~토 19:00(KST) 갱신되므로 그 이후인 20:30 KST = 11:30 UTC 에 돈다.
+# 0단계 regions 는 법정동코드 파일(data/, 커밋 제외)이 필요하므로 로컬에서만 돌린다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 실행할 ETL
+        required: true
+        default: places
+        type: choice
+        options:
+          - places
+  # schedule:
+  #   - cron: "30 11 * * 1-6"   # 1단계에서 주석 해제
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: etl
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LOCALDATA_API_KEY: ${{ secrets.LOCALDATA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: etl/requirements.txt
+      - run: pip install -r requirements.txt
+
+      # 1단계에서 python run.py places 를 만든 뒤 주석을 해제한다.
+      - name: sync
+        run: |
+          echo "TODO(1단계): python run.py ${{ inputs.source }}"
+          exit 1
+
+      # 실패는 sync_logs 에도 남지만, 알림이 없으면 며칠씩 모른 채로 지나간다.
+      # 1단계에서 실패 알림(이슈 생성 등)을 붙일 것. (plan.md 1단계 "실패 시 알림")

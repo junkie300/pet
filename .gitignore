@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 비밀값
+.env
+*.keystore
+*.jks
+local.properties
+
+# 안드로이드 (1단계 이후)
+.gradle/
+build/
+.idea/
+*.iml
+captures/
+
+# OS
+Thumbs.db
+.DS_Store

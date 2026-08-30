@@ -1,0 +1,26 @@
+name: test
+
+on:
+  push:
+    paths:
+      - "etl/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "etl/**"
+  workflow_dispatch:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: etl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 테스트는 표준 라이브러리만 쓰므로 의존성 설치가 필요 없다.
+      - name: unittest
+        run: python -m unittest discover -s tests -v

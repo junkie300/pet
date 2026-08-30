@@ -1,0 +1,9 @@
+# 0단계 최소 의존성
+supabase==2.15.1        # Supabase Python 클라이언트 (PostgREST 래퍼)
+python-dotenv==1.0.1    # .env 로딩
+requests==2.32.3        # 공공 API 호출
+
+# 이후 단계에서 필요해지면 주석을 푼다
+# pyproj==3.6.1         # 1단계: LOCALDATA 좌표계(EPSG) → 4326 변환
+# pandas==2.2.2         # 4단계: 식약처 Excel 파싱
+# openpyxl==3.1.5       # 4단계: 〃
