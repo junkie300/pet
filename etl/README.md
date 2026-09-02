@@ -17,6 +17,8 @@ etl/
       regions.py             0단계 · 법정동코드 → regions
       mapping.py             0단계 · APMS·TourAPI 지역코드 → regions 외부코드 컬럼
       coords.py              0단계 · 읍면동 중심좌표 (카카오 로컬 API)
+    status.py                "지금 어디까지 왔나" 요약 (python run.py status)
+    publicapi.py             공공데이터포털 공통 클라이언트
   tests/                     표준 라이브러리 unittest (의존성 불필요)
 ```
 

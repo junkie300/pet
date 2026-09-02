@@ -6,6 +6,7 @@
     python run.py mapping --dry-run              # 외부 코드 매핑 결과만 확인
     python run.py mapping                        # regions 에 외부 코드 반영
     python run.py coords --limit 50              # 읍면동 중심좌표 (빈 곳만, 50개씩)
+    python run.py status                         # 지금 어디까지 왔는지 (작업 재개 시 첫 명령)
 """
 
 from __future__ import annotations
@@ -49,6 +50,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_coords.add_argument("--all", action="store_true",
                           help="이미 좌표가 있는 곳도 다시 조회한다 (기본은 빈 곳만)")
 
+    sub.add_parser("status", help="지금 어디까지 왔는지 한 화면에 출력 (작업 재개용)")
+
     return parser
 
 
@@ -91,6 +94,12 @@ def main() -> int:
 
         coords.run(client=get_client(), dry_run=args.dry_run,
                    limit=args.limit, only_missing=not args.all)
+
+    elif args.command == "status":
+        from petetl.db import get_client
+        from petetl.status import report
+
+        print(report(get_client()))
 
     return 0
 

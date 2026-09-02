@@ -18,10 +18,14 @@
 supabase/
   migrations/          DB 스키마 (번호 순으로 실행)
   apply_all.sql        위 7개를 이어붙인 것 — SQL Editor 에 한 번에 붙여넣기용
-  verify.sql           스키마가 제대로 들어갔는지 점검
+  verify.sql           스키마·적재·매핑·좌표를 한 번에 점검
 etl/                   공공데이터 → Supabase 파이썬 ETL   → etl/README.md
+  run.py                 진입점 (status · regions · mapping · coords)
+  petetl/status.py       "지금 어디까지 왔나" 요약
+  petetl/publicapi.py    공공데이터포털 공통 클라이언트
+  petetl/sources/        소스별 ETL
 app/                   안드로이드 앱 (1단계에서 생성 예정)
-.github/workflows/     test.yml(동작 중) · etl.yml(1단계에서 활성화)
+.github/workflows/     test.yml · etl.yml(mapping·coords 수동 실행 가능)
 ```
 
 ---
@@ -52,26 +56,54 @@ app/                   안드로이드 앱 (1단계에서 생성 예정)
 
 ## 이어서 작업하기
 
-### 환경 되살리기
+### 1. 환경 되살리기
 
 ```
 cd D:\pet\etl
 .venv\Scripts\activate          # 없으면: python -m venv .venv && pip install -r requirements.txt
 ```
 
-`etl/.env` 는 커밋되지 않으므로 **PC를 옮겼다면 다시 만들어야 한다.** (`.env.example` 참고)
+`etl/.env` 는 커밋되지 않는다. **PC를 옮겼다면 다시 만들어야 한다** (`.env.example` 참고).
+
+| 키 | 상태 | 없으면 막히는 것 |
+|---|---|---|
+| `SUPABASE_URL` | ✅ | 전부 |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | 전부 (반드시 **legacy `service_role`**) |
+| `DATA_GO_KR_KEY` | ✅ | `mapping` (APMS·TourAPI) |
+| `KAKAO_REST_API_KEY` | ❌ | `coords` (읍면동 중심좌표) |
+| `LOCALDATA_API_KEY` | ❌ | `localdata_cd` · 1·2단계 |
+
+### 2. 지금 어디까지 왔는지 확인 — **여기서 시작한다**
 
 ```
-python -c "from petetl.config import load_settings; from petetl.db import jwt_role; s=load_settings(); print(s.supabase_url, jwt_role(s.supabase_service_role_key))"
+python run.py status
 ```
 
-→ `https://xxxxx.supabase.co service_role` 이 나오면 정상.
+환경변수 유무(값은 출력하지 않는다) · `regions` 적재 · 0단계 컬럼별 충족률 ·
+최근 ETL 이력 · 다음에 칠 명령을 한 화면에 보여준다.
 
 ```
-python -m unittest discover -s tests    # 28개 통과해야 함
+python -m unittest discover -s tests    # 44개 통과해야 함 (네트워크·DB 불필요)
 ```
 
-### 다음에 할 일 (순서대로)
+DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을 붙여넣는다.
+스키마·RLS·계층·매핑·좌표 범위를 한 번에 점검한다.
+
+### 3. 지금 있는 ETL 명령
+
+| 명령 | 하는 일 | 필요한 키 |
+|---|---|---|
+| `python run.py status` | 현재 상태 요약 | Supabase |
+| `python run.py regions` | 법정동코드 → `regions` (**로컬 전용**, `etl/data/` 파일 필요) | Supabase |
+| `python run.py mapping` | APMS·TourAPI 지역코드 매핑 | `DATA_GO_KR_KEY` |
+| `python run.py coords --limit 50` | 읍면동 중심좌표 | `KAKAO_REST_API_KEY` |
+
+`--dry-run` 을 붙이면 DB 에 쓰지 않는다. `mapping`·`coords` 는 GitHub Actions
+(`.github/workflows/etl.yml`)에서 수동 실행할 수도 있다 — Secrets 에 같은 이름으로 넣어둘 것.
+
+### 4. 다음에 할 일 (순서대로)
+
+> 1~3 은 **오늘 안에 끝나는 것들**이다. 승인 대기가 없다.
 
 1. **카카오 REST API 키** — https://developers.kakao.com 에서 앱 추가하면 즉시 나온다.
    `.env` 에 `KAKAO_REST_API_KEY` 를 넣고 `python run.py coords --limit 50` 으로 소량 먼저 확인
