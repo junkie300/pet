@@ -3,6 +3,9 @@
 사용 예:
     python run.py regions --dry-run --sample 5   # 인증키 없이 파싱 결과만 확인
     python run.py regions                        # Supabase 에 적재
+    python run.py mapping --dry-run              # 외부 코드 매핑 결과만 확인
+    python run.py mapping                        # regions 에 외부 코드 반영
+    python run.py coords --limit 50              # 읍면동 중심좌표 (빈 곳만, 50개씩)
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import sys
 from pathlib import Path
 
 from petetl.config import ConfigError
-from petetl.sources import regions
+from petetl.sources import coords, mapping, regions
 
 
 def _setup_logging() -> None:
@@ -23,6 +26,9 @@ def _setup_logging() -> None:
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="replace")
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
+    # supabase 클라이언트가 요청마다 URL 을 통째로 찍는다. ETL 로그가 파묻힌다.
+    for noisy in ("httpx", "hpack", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -33,6 +39,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_regions.add_argument("--file", type=Path, default=None, help="법정동코드 전체자료 txt 경로")
     p_regions.add_argument("--dry-run", action="store_true", help="DB 에 쓰지 않고 결과만 확인")
     p_regions.add_argument("--sample", type=int, default=0, help="결과 중 N행을 레벨별로 출력")
+
+    p_mapping = sub.add_parser("mapping", help="0단계: regions 에 APMS·TourAPI 지역코드 매핑")
+    p_mapping.add_argument("--dry-run", action="store_true", help="DB 에 쓰지 않고 결과만 확인")
+
+    p_coords = sub.add_parser("coords", help="0단계: 읍면동 중심좌표 채우기 (카카오 로컬 API)")
+    p_coords.add_argument("--dry-run", action="store_true", help="DB 에 쓰지 않고 결과만 확인")
+    p_coords.add_argument("--limit", type=int, default=None, help="한 번에 처리할 최대 개수")
+    p_coords.add_argument("--all", action="store_true",
+                          help="이미 좌표가 있는 곳도 다시 조회한다 (기본은 빈 곳만)")
 
     return parser
 
@@ -64,6 +79,18 @@ def main() -> int:
             client = get_client()
         rows = regions.run(client=client, path=args.file, dry_run=args.dry_run)
         _print_sample(rows, args.sample)
+
+    elif args.command == "mapping":
+        # 매핑은 regions 를 읽어야 하므로 dry-run 에서도 DB 연결이 필요하다.
+        from petetl.db import get_client
+
+        mapping.run(client=get_client(), dry_run=args.dry_run)
+
+    elif args.command == "coords":
+        from petetl.db import get_client
+
+        coords.run(client=get_client(), dry_run=args.dry_run,
+                   limit=args.limit, only_missing=not args.all)
 
     return 0
 

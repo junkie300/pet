@@ -40,19 +40,22 @@
 
 가장 중요하면서 가장 눈에 띄지 않는 작업. **이후 모든 단계가 여기에 의존한다.**
 
-- [ ] Supabase 프로젝트 생성, PostGIS 확장 활성화
-- [ ] `regions` 테이블 생성 (`spec.md` §3.1)
-- [ ] TourAPI `법정동코드정보`로 기준 데이터 적재 (시도/시군구/읍면동 3레벨)
-- [ ] LOCALDATA 지역코드 매핑 (`localdata_cd`)
-- [ ] 국가동물보호정보시스템 시도·시군구 코드 매핑 (`apms_upr_cd`, `apms_org_cd`)
-- [ ] TourAPI areaCode·sigunguCode 매핑 (`tour_area_cd`, `tour_sigungu_cd`)
-- [ ] 읍면동 중심좌표 채우기
-- [ ] RLS 정책: `anon` SELECT만 허용
+- [x] Supabase 프로젝트 생성, PostGIS 확장 활성화
+- [x] `regions` 테이블 생성 (`spec.md` §3.1)
+- [x] 기준 데이터 적재 (시도 16 · 시군구 256 · 읍면동 5,067)
+      ※ TourAPI 법정동코드정보가 아니라 **행정표준코드관리시스템 전체자료**를 썼다 (D-31)
+- [ ] LOCALDATA 지역코드 매핑 (`localdata_cd`) ← **LOCALDATA 인증키 대기**
+- [x] 국가동물보호정보시스템 시도·시군구 코드 매핑 (`apms_upr_cd`, `apms_org_cd`)
+- [x] TourAPI areaCode·sigunguCode 매핑 (`tour_area_cd`, `tour_sigungu_cd`)
+- [ ] 읍면동 중심좌표 채우기 ← **카카오 REST API 키 필요** (ETL 은 작성 완료, 키만 있으면 실행)
+- [x] RLS 정책: `anon` SELECT만 허용
 
 **완료 기준 (DoD)**
-- 전국 읍면동이 빠짐없이 들어있다
-- 임의의 읍면동 10곳을 골라 4개 외부 코드가 모두 정확히 매핑된다
-- `parent_code` 계층이 끊긴 곳이 없다
+- [x] 전국 읍면동이 빠짐없이 들어있다 (5,067)
+- [◐] 임의의 읍면동 10곳을 골라 4개 외부 코드가 모두 정확히 매핑된다
+      → APMS·TourAPI 4개 컬럼은 **미매핑 0건**으로 확인 (2026-09-02).
+        `localdata_cd` 만 남았다
+- [x] `parent_code` 계층이 끊긴 곳이 없다
 
 > ⚠️ 이 단계에서 **행정동/법정동 불일치**를 만나게 된다. 기준을 법정동으로 고정하고 문서에 남길 것.
 

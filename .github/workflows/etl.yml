@@ -1,9 +1,12 @@
 name: etl
 
-# 1단계(동물병원)에서 활성화한다. 지금은 수동 실행만 가능하도록 두었다.
+# 지금 돌릴 수 있는 것: mapping, coords (둘 다 수동 실행)
 #
-# LOCALDATA 는 월~토 19:00(KST) 갱신되므로 그 이후인 20:30 KST = 11:30 UTC 에 돈다.
-# 0단계 regions 는 법정동코드 파일(data/, 커밋 제외)이 필요하므로 로컬에서만 돌린다.
+# regions 는 법정동코드 파일(etl/data/, 커밋 제외)이 필요하므로 로컬에서만 돌린다.
+# places 는 1단계에서 만든다.
+#
+# 정기 실행(cron)은 1단계 places 가 생긴 뒤에 켠다.
+# LOCALDATA 는 월~토 19:00(KST) 갱신되므로 그 이후인 20:30 KST = 11:30 UTC 가 적당하다.
 
 on:
   workflow_dispatch:
@@ -11,10 +14,17 @@ on:
       source:
         description: 실행할 ETL
         required: true
-        default: places
+        default: mapping
         type: choice
         options:
-          - places
+          - mapping   # regions 에 APMS·TourAPI 지역코드 매핑 (DATA_GO_KR_KEY 필요)
+          - coords    # 읍면동 중심좌표 (KAKAO_REST_API_KEY 필요)
+          - places    # 1단계에서 구현
+      dry_run:
+        description: DB 에 쓰지 않고 결과만 확인
+        required: false
+        default: false
+        type: boolean
   # schedule:
   #   - cron: "30 11 * * 1-6"   # 1단계에서 주석 해제
 
@@ -28,6 +38,10 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # 공공데이터포털은 계정당 키 1개다. APMS·TourAPI 가 공유한다.
+      # 반드시 Decoding 키를 Secret 에 넣는다 (Encoding 키는 이중 인코딩으로 실패).
+      DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+      KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
       LOCALDATA_API_KEY: ${{ secrets.LOCALDATA_API_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -38,11 +52,15 @@ jobs:
           cache-dependency-path: etl/requirements.txt
       - run: pip install -r requirements.txt
 
-      # 1단계에서 python run.py places 를 만든 뒤 주석을 해제한다.
-      - name: sync
+      - name: places 는 아직 없다
+        if: inputs.source == 'places'
         run: |
-          echo "TODO(1단계): python run.py ${{ inputs.source }}"
+          echo "::error::places 는 1단계에서 구현한다."
           exit 1
+
+      - name: sync
+        if: inputs.source != 'places'
+        run: python run.py ${{ inputs.source }} ${{ inputs.dry_run && '--dry-run' || '' }}
 
       # 실패는 sync_logs 에도 남지만, 알림이 없으면 며칠씩 모른 채로 지나간다.
       # 1단계에서 실패 알림(이슈 생성 등)을 붙일 것. (plan.md 1단계 "실패 시 알림")
