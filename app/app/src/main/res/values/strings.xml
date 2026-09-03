@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 앱 이름은 아직 미정이다 (DECISIONS.md D-35). 스토어 등록 전에 확정한다. -->
+    <string name="app_name">반려동물 외출준비</string>
+
+    <string name="tab_places">장소</string>
+    <string name="tab_more">더보기</string>
+
+    <string name="region_picker_title">지역 선택</string>
+    <string name="region_level_sido">시도</string>
+    <string name="region_level_sigungu">시군구</string>
+    <string name="region_level_eupmyeondong">읍면동</string>
+    <string name="region_recent">최근 선택한 지역</string>
+    <string name="region_search_hint">지역명으로 검색 (예: 연남동)</string>
+    <string name="region_confirm">이 지역으로 보기</string>
+
+    <string name="state_empty_regions">해당하는 지역이 없습니다</string>
+    <string name="state_failed">정보를 불러오지 못했습니다</string>
+    <string name="state_retry">다시 시도</string>
+    <string name="state_not_configured">Supabase 접속 정보가 설정되지 않았습니다.\nlocal.properties 에 SUPABASE_URL 과 SUPABASE_ANON_KEY 를 넣으세요.</string>
+</resources>

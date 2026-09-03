@@ -24,13 +24,19 @@ etl/                   공공데이터 → Supabase 파이썬 ETL   → etl/READ
   petetl/status.py       "지금 어디까지 왔나" 요약
   petetl/publicapi.py    공공데이터포털 공통 클라이언트
   petetl/sources/        소스별 ETL
-app/                   안드로이드 앱 (1단계에서 생성 예정)
+app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.md
+  gradle/libs.versions.toml   의존성 버전은 전부 여기서만 바꾼다
+  local.properties.example    Supabase 접속 정보 — 복사해서 local.properties 로
+  app/src/main/java/.../
+    data/                     regions 조회 · 최근 지역 저장
+    ui/region/                S-01 지역 선택 화면
+    ui/common/UiState.kt      로딩 / 없음 / 실패를 타입으로 구분
 .github/workflows/     test.yml · etl.yml(mapping·coords 수동 실행 가능)
 ```
 
 ---
 
-## 진행 상황 (2026-09-02)
+## 진행 상황 (2026-09-03)
 
 ### 0단계 — 지역코드 정규화 ◐ 거의 완료
 
@@ -40,8 +46,22 @@ app/                   안드로이드 앱 (1단계에서 생성 예정)
       → **시도 16 · 시군구 256 · 읍면동 5,067**
 - [x] 국가동물보호정보시스템 코드 매핑 (`apms_upr_cd`, `apms_org_cd`) — **미매핑 0**
 - [x] TourAPI 코드 매핑 (`tour_area_cd`, `tour_sigungu_cd`) — **미매핑 0**
-- [ ] LOCALDATA 지역코드 매핑 (`localdata_cd`) ← **1단계에 바로 필요. LOCALDATA 인증키 대기**
+- [ ] LOCALDATA 지역코드 매핑 (`localdata_cd`) ← **2단계 미용시설에 필요. LOCALDATA 인증키 대기**
 - [ ] 읍면동 중심좌표 (`center_lat`, `center_lng`) ← **카카오 REST API 키 대기** (ETL 작성 완료)
+
+### 1단계 — 동물병원 ◐ 앱 뼈대 착수
+
+- [x] 안드로이드 프로젝트 생성 — `app/`. **debug·release 빌드와 단위 테스트 5개 통과 확인**
+      (release APK 2.5MB — spec 의 30MB 예산 안)
+- [x] Supabase Kotlin SDK 연결. anon 키는 `local.properties` 에서 읽어 `BuildConfig` 로 넣는다
+- [x] S-01 지역 선택 — 시도→시군구→읍면동 3단 드롭다운 · 지역명 검색 · 최근 지역 3개
+- [x] 로딩 / 데이터 없음 / 불러오기 실패를 **타입으로 구분** (`UiState`) · 다크 모드
+- [ ] **화면을 실제로 띄워 보기** ← **Supabase anon 키 대기** (아래 '다음에 할 일' 1번)
+- [ ] 동물병원 ETL ← **행안부 15154952 활용신청 대기** (D-37 — 신청해야 엔드포인트가 열린다)
+- [ ] 지도(S-02)·상세(S-03) ← 카카오 **네이티브 앱 키** 대기
+
+> 앱이 부르는 4가지 `regions` 질의(시도 목록 · 하위 목록 · 이름 검색 · 코드 조회)는
+> REST 로 직접 때려서 **응답이 나오는 것까지 확인했다.** 남은 것은 앱에 키를 넣고 띄우는 것뿐이다.
 
 ### 병행 트랙
 
@@ -71,7 +91,14 @@ cd D:\pet\etl
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | 전부 (반드시 **legacy `service_role`**) |
 | `DATA_GO_KR_KEY` | ✅ | `mapping` (APMS·TourAPI) |
 | `KAKAO_REST_API_KEY` | ❌ | `coords` (읍면동 중심좌표) |
-| `LOCALDATA_API_KEY` | ❌ | `localdata_cd` · 1·2단계 |
+| `LOCALDATA_API_KEY` | ❌ | `localdata_cd` · 2단계 미용시설 |
+
+앱은 `.env` 가 아니라 **`app/local.properties`** 를 쓴다 (`app/local.properties.example` 참고).
+
+| 키 | 상태 | 없으면 막히는 것 |
+|---|---|---|
+| `SUPABASE_URL` | ✅ | — |
+| `SUPABASE_ANON_KEY` | ❌ | 앱 화면에 데이터가 안 뜬다 (앱은 켜지고 안내 문구가 나온다) |
 
 ### 2. 지금 어디까지 왔는지 확인 — **여기서 시작한다**
 
@@ -105,13 +132,18 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 
 > 1~3 은 **오늘 안에 끝나는 것들**이다. 승인 대기가 없다.
 
-1. **카카오 REST API 키** — https://developers.kakao.com 에서 앱 추가하면 즉시 나온다.
-   `.env` 에 `KAKAO_REST_API_KEY` 를 넣고 `python run.py coords --limit 50` 으로 소량 먼저 확인
-2. **`15154952` 활용신청** — https://www.data.go.kr/data/15154952/openapi.do 자동승인.
-   행안부 동물병원 조회서비스. **LOCALDATA 없이도 1단계를 시작할 수 있다**
-3. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 여기서 안 통한다).
+1. **Supabase anon 키** — 대시보드 > Project Settings > API Keys > Legacy API keys 의
+   **`anon` (public)** 쪽. `app/local.properties` 의 `SUPABASE_ANON_KEY=` 에 붙여넣고
+   `cd app && gradlew installDebug` 하면 **지역 선택 화면이 실제로 뜬다.** 1분이면 끝난다.
+   ⚠️ `service_role` 키를 넣지 말 것 — APK 에 그대로 노출된다
+2. **카카오 개발자 앱 추가** — https://developers.kakao.com. 앱 하나에서 키 2종이 같이 나온다.
+   · **REST API 키** → `etl/.env` 의 `KAKAO_REST_API_KEY`, 이어서 `python run.py coords --limit 50`
+   · **네이티브 앱 키** → 지도(S-02) 붙일 때 쓴다. 지금 받아두면 된다
+3. **`15154952` 활용신청** — https://www.data.go.kr/data/15154952/openapi.do 자동승인.
+   ⚠️ **신청해야 엔드포인트 명세가 열린다** (D-37). 승인 후 마이페이지 > 오픈API > 개발계정에서
+   **참고문서와 요청 URL 을 복사해 올 것.** 그게 있어야 동물병원 ETL 을 쓸 수 있다
+4. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 여기서 안 통한다).
    2단계 미용시설과 `localdata_cd` 에 결국 필요. 발급 후 인증키 **조회번호를 따로 저장**할 것
-4. 1단계 착수 — 동물병원 ETL + 안드로이드 앱 뼈대
 
 > ⚠️ **LOCALDATA API 는 변경분만 준다.** 전체 데이터는 API 가 아니라 다운로드 페이지에서
 > 받아야 한다(전체분 매월 2일 배포). 1단계 ETL 은 **최초 1회 전체분 → 이후 API 증분**

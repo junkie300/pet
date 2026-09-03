@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 색상은 Compose 쪽 Theme.kt 에서 정의한다. 여기는 첫 프레임 배경만 잡는다. -->
+    <style name="Theme.PetApp" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/surface</item>
+    </style>
+</resources>
