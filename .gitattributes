@@ -1,0 +1,11 @@
+# 줄바꿈은 저장소에 LF 로 넣는다. 윈도우 작업 복사본만 CRLF 가 된다.
+* text=auto
+
+# gradlew 는 리눅스 CI 에서 실행된다. CRLF 가 섞이면 셔뱅이 깨진다.
+gradlew text eol=lf
+*.sh text eol=lf
+
+*.jar binary
+*.png binary
+*.keystore binary
+*.jks binary
