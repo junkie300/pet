@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 private val LightColors = lightColorScheme(
     primary = BrandGreen,
     onPrimary = Color.White,
-    primaryContainer = BrandGreenContainer,
+    primaryContainer = BrandGreenSoft,
     onPrimaryContainer = Color(0xFF0B2418),
     secondary = BrandOrange,
     onSecondary = Color.White,
@@ -29,9 +29,9 @@ private val LightColors = lightColorScheme(
     onBackground = Color(0xFF1A1C1B),
     // 아래를 비워 두면 메뉴·카드가 M3 기본 보라로 나온다 (D-45).
     surfaceVariant = SurfaceVariantLight,
-    surfaceContainerLowest = NeutralLowest,
-    surfaceContainerLow = NeutralLow,
-    surfaceContainer = Neutral,
+    surfaceContainerLowest = CardLight,
+    surfaceContainerLow = CardLight,
+    surfaceContainer = CardLight,
     surfaceContainerHigh = NeutralHigh,
     surfaceContainerHighest = NeutralHighest,
     outline = OutlineLight,
@@ -58,9 +58,9 @@ private val DarkColors = darkColorScheme(
     background = SurfaceDark,
     onBackground = Color(0xFFE2E3E0),
     surfaceVariant = SurfaceVariantDark,
-    surfaceContainerLowest = NeutralLowestDark,
-    surfaceContainerLow = NeutralLowDark,
-    surfaceContainer = NeutralDark,
+    surfaceContainerLowest = CardDark,
+    surfaceContainerLow = CardDark,
+    surfaceContainer = CardDark,
     surfaceContainerHigh = NeutralHighDark,
     surfaceContainerHighest = NeutralHighestDark,
     outline = OutlineDark,
@@ -91,5 +91,10 @@ fun PetAppTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    MaterialTheme(colorScheme = colors, typography = PetTypography, content = content)
+    MaterialTheme(
+        colorScheme = colors,
+        typography = PetTypography,
+        shapes = PetShapes,
+        content = content,
+    )
 }

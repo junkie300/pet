@@ -14,6 +14,11 @@
     <string name="region_recent">최근 선택한 지역</string>
     <string name="region_search_hint">지역명으로 검색 (예: 연남동)</string>
     <string name="region_confirm">이 지역으로 보기</string>
+    <string name="region_picker_lead">어디로 함께 갈까요?</string>
+    <string name="region_step_hint">시도 → 시군구 → 읍면동 순으로 고릅니다</string>
+    <string name="region_selected_none">지역을 고르면 여기에 표시됩니다</string>
+    <string name="cd_search">검색</string>
+    <string name="cd_location">선택한 지역</string>
 
     <string name="state_empty_regions">해당하는 지역이 없습니다</string>
     <string name="state_failed">정보를 불러오지 못했습니다</string>

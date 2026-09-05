@@ -7,8 +7,17 @@ val BrandGreen = Color(0xFF2E6B4F)          // Primary
 val BrandGreenContainer = Color(0xFFB8E0C8) // 선택된 필터 칩
 val BrandOrange = Color(0xFFE8734A)         // Secondary — 강조·즐겨찾기
 val EmergencyRed = Color(0xFFD64545)        // Error — 응급·오류 전용. 다른 용도 금지
-val SurfaceLight = Color(0xFFFBFAF8)
+// 시안(이태우_디자인시안)의 바탕은 순백이 아니라 **웜 크림**이고, 그 위에 흰 카드가 뜬다.
+// 이 대비가 시안 톤의 핵심이라 배경과 카드를 다른 값으로 둔다 (D-47).
+val SurfaceLight = Color(0xFFFAF7F0)        // 앱 배경 — 웜 크림
+val CardLight = Color(0xFFFFFFFF)           // 카드 — 배경 위에 떠 보이게
+val BrandGreenSoft = Color(0xFFE8F3EC)      // 아이콘 원형 배경 · 선택된 칩
+val BrandOrangeSoft = Color(0xFFFDEDE5)     // 주황 계열 배지 배경
+
 val SurfaceDark = Color(0xFF14181A)
+val CardDark = Color(0xFF1E2224)
+val BrandGreenSoftDark = Color(0xFF1F5136)
+val BrandOrangeSoftDark = Color(0xFF4A2418)
 
 // Material 3 은 surface 하나만 지정하면 메뉴·카드가 쓰는 surfaceContainer 계열을
 // **기본 보라 팔레트**로 남겨 둔다. 그래서 웜 뉴트럴 램프를 직접 깔아 준다 (D-45).
