@@ -2,10 +2,12 @@ package io.github.junkie300.petapp.ui.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -14,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.junkie300.petapp.R
 
@@ -22,17 +25,26 @@ import io.github.junkie300.petapp.R
 fun SkeletonRows(count: Int = 3, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(count) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .background(
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        RoundedCornerShape(8.dp),
-                    ),
-            ) {}
+            SkeletonBox(height = 48.dp, modifier = Modifier.fillMaxWidth())
         }
     }
+}
+
+/**
+ * 스켈레톤 한 칸. 홈 그리드의 건수처럼 **자리만 잡아 두면 되는** 곳에 쓴다.
+ * [width] 가 null 이면 주어진 너비를 그대로 채운다.
+ */
+@Composable
+fun SkeletonBox(height: Dp, modifier: Modifier = Modifier, width: Dp? = null) {
+    Box(
+        modifier
+            .then(if (width != null) Modifier.width(width) else Modifier)
+            .height(height)
+            .background(
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                RoundedCornerShape(8.dp),
+            ),
+    )
 }
 
 @Composable

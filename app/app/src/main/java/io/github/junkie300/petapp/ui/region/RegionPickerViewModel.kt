@@ -126,9 +126,22 @@ class RegionPickerViewModel(
         }
     }
 
+    /** 3단 드롭다운으로 고른 지역을 확정한다. */
     fun confirmSelection() {
-        val dong = _state.value.selectedDong ?: return
-        viewModelScope.launch { recentStore.remember(dong.code) }
+        _state.value.selectedDong?.let(::remember)
+    }
+
+    /**
+     * 최근 지역 칩처럼 드롭다운을 거치지 않고 바로 정하는 경로.
+     * 여기서도 remember() 를 불러야 홈의 지역 칩이 따라온다 — 홈은 이 저장소만 보고 있다.
+     */
+    fun confirmRegion(region: Region) {
+        _state.update { it.copy(selectedDong = region) }
+        remember(region)
+    }
+
+    private fun remember(region: Region) {
+        viewModelScope.launch { recentStore.remember(region.code) }
     }
 
     private inline fun <T> runCatchingList(block: () -> List<T>): UiState<List<T>> =

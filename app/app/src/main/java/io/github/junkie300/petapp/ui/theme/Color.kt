@@ -44,11 +44,23 @@ val BrandGreenDark = Color(0xFF8FD3AC)
 val BrandOrangeDark = Color(0xFFFFB59B)
 val EmergencyRedDark = Color(0xFFFFB4AB)
 
-/** 카테고리 색. 색만으로 구분하지 않는다 — 아이콘·라벨과 함께 쓴다 (spec §6.5). */
+/**
+ * 카테고리 색 (spec.md §6.2). 색만으로 구분하지 않는다 — 아이콘·라벨과 함께 쓴다 (§6.5).
+ *
+ * ⚠️ **다크 짝이 반드시 있어야 한다.** spec 의 5색은 라이트 배경 기준이라 어두운 카드 위에
+ * 그대로 올리면 대비가 무너진다 (딥그린 건수가 다크 카드에서 거의 안 보였다 — 실측).
+ * 브랜드 색이 `BrandGreen` / `BrandGreenDark` 짝을 갖는 것과 같은 이유다.
+ */
 object CategoryColor {
     val Vet = Color(0xFF2E6B4F)
     val Grooming = Color(0xFF7B5EA7)
     val Restaurant = Color(0xFFE8734A)
     val Tour = Color(0xFF3A7CA5)
     val WildlifeCenter = Color(0xFF6B7A3F)
+
+    val VetDark = BrandGreenDark
+    val GroomingDark = Color(0xFFC9B6E8)
+    val RestaurantDark = BrandOrangeDark
+    val TourDark = Color(0xFF9CCBEA)
+    val WildlifeCenterDark = Color(0xFFC2D18C)
 }

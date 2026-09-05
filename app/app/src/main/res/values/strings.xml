@@ -4,9 +4,50 @@
          이 문자열과 스토어 등록정보의 이름은 출시 후에도 바꿀 수 있다. applicationId 만 영구다. -->
     <string name="app_name">미리펫</string>
 
-    <string name="tab_places">장소</string>
+    <!-- 하단 탭 4개 (spec.md §5.1 · D-39). "마이" 가 아니라 "더보기" 인 이유는 D-39 참고. -->
+    <string name="tab_home">홈</string>
+    <string name="tab_map">지도 탐색</string>
+    <string name="tab_adoption">구조·입양</string>
     <string name="tab_more">더보기</string>
 
+    <!-- S-00 홈 -->
+    <string name="home_lead">오늘은 어디로 함께 갈까요?</string>
+    <string name="home_region_loading">지역을 불러오는 중</string>
+    <string name="home_region_empty">지역을 골라 주세요</string>
+    <!-- ⚠️ 위와 다른 말이다. 고른 지역은 있는데 이름을 못 읽은 상태다 (spec.md §5.3) -->
+    <string name="home_region_failed">지역을 불러오지 못했습니다</string>
+    <string name="home_region_hint">읍면동까지 고르면 그 동네 정보만 모아 봅니다</string>
+    <string name="home_count">%1$d곳</string>
+    <!-- ⚠️ "0곳" 과 다른 말이다. 아직 적재하지 않은 카테고리에만 쓴다 — PlaceCategory.loaded 참고 -->
+    <string name="home_count_pending">준비 중</string>
+    <string name="home_count_unknown">—</string>
+    <string name="cd_change_region">지역 바꾸기</string>
+
+    <!-- 카테고리 6칸 (spec.md §5.1). 입양만 places 가 아니라 animals 에서 온다. -->
+    <string name="category_hospital">동물병원</string>
+    <string name="category_grooming">미용</string>
+    <string name="category_restaurant">동반 식당</string>
+    <string name="category_tour">동반 여행</string>
+    <string name="category_wildlife">구조단체</string>
+    <string name="category_adoption">입양 친구들</string>
+
+    <!-- 아직 안 만든 탭. 빈 화면 대신 무엇을 기다리는지 적는다. -->
+    <string name="coming_soon_map_title">지도는 준비 중입니다</string>
+    <string name="coming_soon_map_body">카카오맵 네이티브 앱 키가 들어오면 열립니다.\n동물병원 데이터는 이미 전국 분량이 들어와 있습니다.</string>
+    <string name="coming_soon_map_chosen">고른 카테고리 · %1$s</string>
+    <string name="coming_soon_adoption_title">구조·입양은 아직입니다</string>
+    <string name="coming_soon_adoption_body">국가동물보호정보시스템 연동이 끝나면\n보호 중인 동물과 보호센터가 여기 들어옵니다.</string>
+
+    <!-- 더보기 -->
+    <string name="more_favorites">즐겨찾기</string>
+    <string name="more_sources">데이터 출처</string>
+    <string name="more_source_region">지역 · 행정안전부 법정동코드</string>
+    <string name="more_source_hospital">동물병원 · 행정안전부 지방행정인허가데이터</string>
+    <string name="more_source_note">장소별 기준일은 각 장소 상세에서 확인할 수 있습니다.</string>
+    <string name="more_app_info">앱 정보</string>
+    <string name="more_version">버전 %1$s</string>
+
+    <!-- S-01 지역 선택 -->
     <string name="region_picker_title">지역 선택</string>
     <string name="region_level_sido">시도</string>
     <string name="region_level_sigungu">시군구</string>
@@ -14,7 +55,7 @@
     <string name="region_recent">최근 선택한 지역</string>
     <string name="region_search_hint">지역명으로 검색 (예: 연남동)</string>
     <string name="region_confirm">이 지역으로 보기</string>
-    <string name="region_picker_lead">어디로 함께 갈까요?</string>
+    <string name="region_picker_lead">어느 동네를 미리 볼까요?</string>
     <string name="region_step_hint">시도 → 시군구 → 읍면동 순으로 고릅니다</string>
     <string name="region_selected_none">지역을 고르면 여기에 표시됩니다</string>
     <string name="cd_search">검색</string>

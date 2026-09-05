@@ -1,6 +1,7 @@
 package io.github.junkie300.petapp
 
 import android.content.Context
+import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.RecentRegionStore
 import io.github.junkie300.petapp.data.RegionRepository
 import io.github.junkie300.petapp.data.SupabaseProvider
@@ -14,5 +15,6 @@ import io.github.junkie300.petapp.data.SupabaseProvider
 class AppContainer(context: Context) {
     val isConfigured: Boolean = SupabaseProvider.isConfigured
     val regionRepository: RegionRepository by lazy { RegionRepository(SupabaseProvider.client) }
+    val placeRepository: PlaceRepository by lazy { PlaceRepository(SupabaseProvider.client) }
     val recentRegionStore: RecentRegionStore = RecentRegionStore(context.applicationContext)
 }

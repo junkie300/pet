@@ -97,7 +97,13 @@ fun RegionPickerScreen(
         }
 
         if (state.recent.isNotEmpty()) {
-            RecentRegions(regions = state.recent, onSelect = onRegionConfirmed)
+            RecentRegions(
+                regions = state.recent,
+                onSelect = { region ->
+                    viewModel.confirmRegion(region)
+                    onRegionConfirmed(region)
+                },
+            )
         }
 
         StepCard(state = state, viewModel = viewModel)
