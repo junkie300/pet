@@ -62,7 +62,7 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
 - [x] Supabase anon 키 투입 — **debug 빌드 성공**. anon 키로 `regions` 질의 4종 + RLS 쓰기 차단까지 실측 확인
 - [x] **에뮬레이터에서 실제로 띄워 확인** — 시도 16개(전남광주통합특별시 포함) · 3단 연동 ·
       최근 지역이 앱 재시작 후에도 유지 · 라이트/다크 · 오프라인 실패와 재시도 회복까지
-- [ ] 동물병원 ETL ← **행안부 15154952 활용신청 대기** (D-37 — 신청해야 엔드포인트가 열린다)
+- [x] 동물병원 ETL — 엔드포인트 확보(`animal_hospitals/**info**`), 좌표계 EPSG:5174 검산, `places` 적재
 - [ ] 지도(S-02)·상세(S-03) ← 카카오 **네이티브 앱 키** 대기
 
 > 앱이 부르는 4가지 `regions` 질의(시도 목록 · 하위 목록 · 이름 검색 · 코드 조회)를
@@ -119,7 +119,7 @@ python run.py status
 최근 ETL 이력 · 다음에 칠 명령을 한 화면에 보여준다.
 
 ```
-python -m unittest discover -s tests    # 51개 통과해야 함 (네트워크·DB 불필요)
+python -m unittest discover -s tests    # 72개 통과해야 함 (네트워크·DB 불필요)
 ```
 
 DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을 붙여넣는다.
@@ -134,17 +134,15 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 | `python run.py mapping` | APMS·TourAPI 지역코드 매핑 | `DATA_GO_KR_KEY` |
 | `python run.py coords --limit 50` | 읍면동 중심좌표 | `KAKAO_REST_API_KEY` |
 | `python run.py localdata` | LOCALDATA 자치단체코드 매핑 | **없음** (`etl/docs/` 엑셀) |
+| `python run.py hospitals --limit 300 --dry-run` | 동물병원 → `places` | `DATA_GO_KR_KEY` (+ 카카오로 보완) |
 
 `--dry-run` 을 붙이면 DB 에 쓰지 않는다. `mapping`·`coords` 는 GitHub Actions
 (`.github/workflows/etl.yml`)에서 수동 실행할 수도 있다 — Secrets 에 같은 이름으로 넣어둘 것.
 
 ### 4. 다음에 할 일 (순서대로)
 
-> 앱 쪽은 **막힌 것이 없다.** 다음 두 개는 전부 외부 승인 대기다.
-
-1. **`15154952` 활용신청** — https://www.data.go.kr/data/15154952/openapi.do 자동승인.
-   ⚠️ **신청해야 엔드포인트 명세가 열린다** (D-37). 승인 후 마이페이지 > 오픈API > 개발계정에서
-   **참고문서와 요청 URL 을 복사해 올 것.** 그게 있어야 동물병원 ETL 을 쓸 수 있다
+1. **카카오 네이티브 앱 키** — 지도(S-02)를 붙이려면 필요하다. REST 키와 **같은 앱**에서 나온다
+   (developers.kakao.com > 내 애플리케이션 > 앱 키 > 네이티브 앱 키)
 2. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 여기서 안 통한다).
    2단계 미용시설과 `localdata_cd` 에 결국 필요. 발급 후 인증키 **조회번호를 따로 저장**할 것
 

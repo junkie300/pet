@@ -24,7 +24,8 @@ TIMEOUT = 30
 RETRIES = 3
 RETRY_WAIT = 2  # 초. 포털은 순간 부하로 간헐 500 을 낸다
 
-OK_CODES = {"00", "0000"}
+# 서비스마다 자릿수가 다르다 — APMS "00" · TourAPI "0000" · 행안부 동물병원 "0".
+OK_CODES = {"0", "00", "0000"}
 
 
 class PublicApiError(RuntimeError):
