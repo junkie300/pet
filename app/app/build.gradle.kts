@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -16,6 +17,33 @@ val localProperties = Properties().apply {
 
 fun secret(name: String): String =
     (localProperties.getProperty(name) ?: System.getenv(name) ?: "").trim()
+
+/** legacy JWT 키에서 role 클레임을 읽는다. JWT 가 아니면 null (새 형식은 판별할 수 없다). */
+fun jwtRole(key: String): String? {
+    val parts = key.split(".")
+    if (parts.size != 3) return null
+    return runCatching {
+        val payload = String(Base64.getUrlDecoder().decode(parts[1]))
+        payload.substringAfter(""""role":"""", "").substringBefore('"').ifBlank { null }
+    }.getOrNull()
+}
+
+// service_role 키는 RLS 를 우회한다. APK 에 들어가면 누구나 DB 를 쓸 수 있게 된다.
+// etl/petetl/db.py 가 반대 방향(anon 을 ETL 에 넣는 것)을 막는 것과 같은 이유의 방어다.
+// 이쪽이 더 위험하다 — ETL 은 실패로 끝나지만, 이건 공개된 APK 안에 남는다.
+val anonKey = secret("SUPABASE_ANON_KEY")
+val anonKeyRole = jwtRole(anonKey)
+if (anonKeyRole != null && anonKeyRole != "anon") {
+    throw GradleException(
+        """
+        SUPABASE_ANON_KEY 에 role='$anonKeyRole' 키가 들어 있습니다. 앱에는 'anon' 키만 넣습니다.
+          → 이 키는 APK 안에 그대로 박혀서 배포됩니다. service_role 이면 DB 가 열립니다.
+          → Supabase 대시보드 > Project Settings > API Keys > Legacy API keys 에서
+            'anon' (public 이라고 표시된 쪽) 키로 바꾸세요.
+          → 'service_role' (secret) 키는 ETL 전용이며 etl/.env 에만 둡니다.
+        """.trimIndent(),
+    )
+}
 
 android {
     namespace = "io.github.junkie300.petapp"
