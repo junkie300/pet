@@ -16,6 +16,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,6 +39,10 @@ import io.github.junkie300.petapp.ui.home.HomeCategory
 import io.github.junkie300.petapp.ui.home.HomeScreen
 import io.github.junkie300.petapp.ui.home.HomeViewModel
 import io.github.junkie300.petapp.ui.more.MoreScreen
+import io.github.junkie300.petapp.ui.place.PlaceDetailScreen
+import io.github.junkie300.petapp.ui.place.PlaceDetailViewModel
+import io.github.junkie300.petapp.ui.place.PlaceListScreen
+import io.github.junkie300.petapp.ui.place.PlaceListViewModel
 import io.github.junkie300.petapp.ui.region.RegionPickerScreen
 import io.github.junkie300.petapp.ui.region.RegionPickerViewModel
 
@@ -64,6 +69,14 @@ private const val ROUTE_REGION = "region"
 /** 홈 그리드에서 카테고리를 눌러 들어올 때 실어 보내는 값. 없이 들어오면 전체다. */
 private const val ARG_CATEGORY = "category"
 private val MAP_ROUTE_PATTERN = "${PetTab.MAP.route}?$ARG_CATEGORY={$ARG_CATEGORY}"
+
+/**
+ * 장소 목록·상세. **탭이 아니다** — 홈 위에 얹는다.
+ * 지도가 붙으면 목록은 S-02 의 바텀시트로 들어가지만, 상세는 이 자리에 그대로 남는다.
+ */
+private const val ARG_PLACE_ID = "placeId"
+private val PLACES_ROUTE_PATTERN = "places/{$ARG_CATEGORY}"
+private val PLACE_DETAIL_ROUTE_PATTERN = "place/{$ARG_PLACE_ID}"
 
 @Composable
 fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
@@ -101,10 +114,9 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                 HomeScreen(
                     viewModel = viewModel,
                     onRegionClick = { navController.navigate(ROUTE_REGION) },
+                    // 지도가 아직 없으므로 목록으로 간다. 지도가 붙으면 여기만 S-02 로 바꾼다.
                     onCategoryClick = { category ->
-                        // 지도는 **탭**이다. 홈 위에 얹으면 홈 탭의 저장된 백스택에 딸려 들어가서,
-                        // 나중에 홈 탭을 눌렀을 때 지도가 되살아난다 (실측). 탭 전환으로 간다.
-                        navController.switchTab("${PetTab.MAP.route}?$ARG_CATEGORY=${category.dbValue}")
+                        navController.navigate("places/${category.dbValue}")
                     },
                 )
             }
@@ -121,6 +133,45 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     // 지역을 정하면 홈으로 돌아간다. 홈은 최근 지역 저장소를 보고 있으므로
                     // 따로 결과를 넘기지 않아도 새 지역으로 다시 그린다.
                     onRegionConfirmed = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = PLACES_ROUTE_PATTERN,
+                arguments = listOf(navArgument(ARG_CATEGORY) { type = NavType.StringType }),
+            ) { entry ->
+                // 모르는 카테고리로 들어오면 홈으로 돌려보낸다. 빈 화면을 내놓지 않는다.
+                val category = PlaceCategory.fromDbValue(entry.arguments?.getString(ARG_CATEGORY))
+                if (category == null) {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                } else {
+                    val viewModel: PlaceListViewModel = viewModel(
+                        factory = PlaceListViewModel.factory(
+                            category,
+                            container.regionRepository,
+                            container.placeRepository,
+                            container.recentRegionStore,
+                        ),
+                    )
+                    PlaceListScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() },
+                        onPlaceClick = { place -> navController.navigate("place/${place.id}") },
+                    )
+                }
+            }
+
+            composable(
+                route = PLACE_DETAIL_ROUTE_PATTERN,
+                arguments = listOf(navArgument(ARG_PLACE_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val placeId = entry.arguments?.getLong(ARG_PLACE_ID) ?: 0L
+                val viewModel: PlaceDetailViewModel = viewModel(
+                    factory = PlaceDetailViewModel.factory(placeId, container.placeRepository),
+                )
+                PlaceDetailScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
                 )
             }
 

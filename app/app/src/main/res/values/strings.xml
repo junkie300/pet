@@ -38,6 +38,37 @@
     <string name="coming_soon_adoption_title">구조·입양은 아직입니다</string>
     <string name="coming_soon_adoption_body">국가동물보호정보시스템 연동이 끝나면\n보호 중인 동물과 보호센터가 여기 들어옵니다.</string>
 
+    <!-- 장소 목록 · S-03 상세 -->
+    <string name="cd_back">뒤로</string>
+    <string name="place_list_no_region">지역을 먼저 골라 주세요</string>
+    <!-- 카테고리 이름 뒤에 조사를 붙이지 않는다 — "구조단체이/가" 처럼 받침에 따라 달라진다 -->
+    <string name="place_list_empty">이 지역에는 등록된 %1$s 정보가 없습니다</string>
+    <string name="place_list_count">총 %1$d곳</string>
+
+    <string name="place_detail_title">장소</string>
+    <string name="place_detail_gone">이 장소는 목록에서 빠졌습니다. 폐업했거나 정보가 바뀐 것일 수 있습니다.</string>
+    <string name="place_field_address_road">도로명 주소</string>
+    <string name="place_field_address_jibun">지번 주소</string>
+    <string name="place_field_tel">전화</string>
+    <string name="place_field_status">영업상태</string>
+    <string name="place_action_route">길찾기</string>
+    <string name="place_action_call">전화</string>
+    <string name="place_action_share">공유</string>
+    <string name="place_action_no_app">이 동작을 받아 줄 앱이 없습니다</string>
+    <string name="place_detail_share">%1$s
+%2$s</string>
+    <string name="place_detail_restaurant_notice">식약처에 등록된 동반출입 업소입니다. 목록에 없어도 동반 가능한 곳이 있을 수 있으니 방문 전 확인하세요.</string>
+
+    <!-- 출처 표기는 의무다 (spec.md §8). 기준일이 없으면 없다고 적는다 — 지어내지 않는다 -->
+    <string name="place_source_line">출처 %1$s · 기준일 %2$s</string>
+    <string name="place_source_line_no_date">출처 %1$s · 기준일 없음</string>
+    <string name="source_localdata">지방행정인허가데이터</string>
+    <string name="source_mfds">식품의약품안전처</string>
+    <string name="source_tourapi">한국관광공사 TourAPI</string>
+    <string name="source_stddata">공공데이터포털 표준데이터</string>
+    <string name="source_kcisa">한국문화정보원</string>
+    <string name="source_unknown">공공데이터</string>
+
     <!-- 더보기 -->
     <string name="more_favorites">즐겨찾기</string>
     <string name="more_sources">데이터 출처</string>
