@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 앱 이름 (D-42). applicationId 는 이름과 무관한 값으로 남겨 둔다 — D-35·D-41 참고.
+    <!-- 앱 이름 (D-43). applicationId 는 이름과 무관한 값으로 남겨 둔다 — D-35·D-41 참고.
          이 문자열과 스토어 등록정보의 이름은 출시 후에도 바꿀 수 있다. applicationId 만 영구다. -->
-    <string name="app_name">대반려지도</string>
+    <string name="app_name">미리팻</string>
 
     <string name="tab_places">장소</string>
     <string name="tab_more">더보기</string>
