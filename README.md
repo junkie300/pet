@@ -41,7 +41,7 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
 
 ## 진행 상황 (2026-09-05)
 
-### 0단계 — 지역코드 정규화 ◐ 거의 완료
+### 0단계 — 지역코드 정규화 ◐ LOCALDATA 만 남음
 
 - [x] Supabase 프로젝트 생성 (`pet-app`, 리전 Seoul), PostGIS·pg_trgm 활성화
 - [x] DB 스키마 전체 적용 — `regions` `places` `shelters` `animals` `sync_logs` + RLS + `places_nearby` RPC
@@ -50,7 +50,7 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
 - [x] 국가동물보호정보시스템 코드 매핑 (`apms_upr_cd`, `apms_org_cd`) — **미매핑 0**
 - [x] TourAPI 코드 매핑 (`tour_area_cd`, `tour_sigungu_cd`) — **미매핑 0**
 - [ ] LOCALDATA 지역코드 매핑 (`localdata_cd`) ← **2단계 미용시설에 필요. LOCALDATA 인증키 대기**
-- [ ] 읍면동 중심좌표 (`center_lat`, `center_lng`) ← **키 확보 완료. `run.py coords` 실행만 남음**
+- [x] 읍면동 중심좌표 (`center_lat`, `center_lng`) — **5,067곳 전량 적재, 실패 0**
 
 ### 1단계 — 동물병원 ◐ 앱 뼈대 착수
 
@@ -60,7 +60,8 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
 - [x] S-01 지역 선택 — 시도→시군구→읍면동 3단 드롭다운 · 지역명 검색 · 최근 지역 3개
 - [x] 로딩 / 데이터 없음 / 불러오기 실패를 **타입으로 구분** (`UiState`) · 다크 모드
 - [x] Supabase anon 키 투입 — **debug 빌드 성공**. anon 키로 `regions` 질의 4종 + RLS 쓰기 차단까지 실측 확인
-- [ ] **화면을 실제로 띄워 보기** ← **기기·에뮬레이터 대기** (`adb devices` 가 비어 있다)
+- [x] **에뮬레이터에서 실제로 띄워 확인** — 시도 16개(전남광주통합특별시 포함) · 3단 연동 ·
+      최근 지역이 앱 재시작 후에도 유지 · 라이트/다크 · 오프라인 실패와 재시도 회복까지
 - [ ] 동물병원 ETL ← **행안부 15154952 활용신청 대기** (D-37 — 신청해야 엔드포인트가 열린다)
 - [ ] 지도(S-02)·상세(S-03) ← 카카오 **네이티브 앱 키** 대기
 
@@ -138,16 +139,12 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 
 ### 4. 다음에 할 일 (순서대로)
 
-> 1~2 는 **오늘 안에 끝나는 것들**이다. 승인 대기가 없다.
+> 앱 쪽은 **막힌 것이 없다.** 다음 두 개는 전부 외부 승인 대기다.
 
-1. **`python run.py coords`** — 읍면동 중심좌표 5,067건. 카카오 REST 키가 이미 있다.
-   `--limit 50` 으로 표본을 먼저 확인한 뒤 전량 돌린다 (D-33)
-2. **기기 또는 에뮬레이터 연결** — `gradlew installDebug` 로 지역 선택 화면을 띄운다.
-   빌드와 anon 키는 이미 검증됐다. `adb devices` 가 비어 있는 것만 남았다
-3. **`15154952` 활용신청** — https://www.data.go.kr/data/15154952/openapi.do 자동승인.
+1. **`15154952` 활용신청** — https://www.data.go.kr/data/15154952/openapi.do 자동승인.
    ⚠️ **신청해야 엔드포인트 명세가 열린다** (D-37). 승인 후 마이페이지 > 오픈API > 개발계정에서
    **참고문서와 요청 URL 을 복사해 올 것.** 그게 있어야 동물병원 ETL 을 쓸 수 있다
-4. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 여기서 안 통한다).
+2. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 여기서 안 통한다).
    2단계 미용시설과 `localdata_cd` 에 결국 필요. 발급 후 인증키 **조회번호를 따로 저장**할 것
 
 > ⚠️ **LOCALDATA API 는 변경분만 준다.** 전체 데이터는 API 가 아니라 다운로드 페이지에서

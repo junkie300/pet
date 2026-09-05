@@ -36,13 +36,16 @@ ENV_KEYS = [
     ("LOCALDATA_API_KEY", "localdata_cd · 1·2단계 동물병원/미용"),
 ]
 
+# (컬럼, 라벨, 모수 level) — level 이 None 이면 regions 전체가 모수다.
+# 중심좌표는 읍면동에만 채운다. 모수를 전체(5,339)로 잡으면 시도·시군구 272행 때문에
+# 다 채워도 영원히 "진행중" 으로 보인다.
 COLUMNS = [
-    ("apms_upr_cd", "APMS 시도"),
-    ("apms_org_cd", "APMS 시군구"),
-    ("tour_area_cd", "TourAPI area"),
-    ("tour_sigungu_cd", "TourAPI sigungu"),
-    ("localdata_cd", "LOCALDATA"),
-    ("center_lat", "중심좌표"),
+    ("apms_upr_cd", "APMS 시도", None),
+    ("apms_org_cd", "APMS 시군구", None),
+    ("tour_area_cd", "TourAPI area", None),
+    ("tour_sigungu_cd", "TourAPI sigungu", None),
+    ("localdata_cd", "LOCALDATA", None),
+    ("center_lat", "중심좌표", 3),
 ]
 
 
@@ -98,10 +101,16 @@ def report(client) -> str:
 
     lines.append("")
     lines.append("=== 0단계 외부 코드 · 좌표 ===")
-    for column, label in COLUMNS:
-        filled = _count(client, **{f"{column}__notnull": None})
-        mark = "완료" if filled >= total - 50 else ("미착수" if filled == 0 else "진행중")
-        lines.append(f"  {_pad(label, 18)}{filled:>5,} / {total:,}   {mark}")
+    for column, label, level in COLUMNS:
+        scope = {"level": level} if level is not None else {}
+        denominator = _count(client, **scope) if level is not None else total
+        filled = _count(client, **scope, **{f"{column}__notnull": None})
+        # 모수 전체가 대상인 컬럼은 시도·세종 때문에 최대 50행이 비는 것이 정상이다(아래 ※).
+        slack = 0 if level is not None else 50
+        mark = ("완료" if filled >= denominator - slack
+                else "미착수" if filled == 0 else "진행중")
+        suffix = "  (읍면동만)" if level == 3 else ""
+        lines.append(f"  {_pad(label, 18)}{filled:>5,} / {denominator:,}   {mark}{suffix}")
     lines.append("  ※ apms_org_cd 의 미충족 50 = 시도 16 + 세종 34 (세종은 시군구가 없다). 정상이다.")
 
     lines.append("")
