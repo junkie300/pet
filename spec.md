@@ -427,7 +427,11 @@ LANGUAGE sql STABLE AS
 
 ### 6.2 컬러
 
-Material 3 기반. Android 12+ **Dynamic Color를 지원하되**, 브랜드 팔레트를 fallback으로 고정한다.
+Material 3 기반. **브랜드 팔레트를 기본으로 고정하고, Dynamic Color 는 끈다** (D-44).
+
+> 처음에는 "Dynamic Color 를 지원하되 브랜드 팔레트를 fallback 으로" 였다. 그런데 그렇게 하면
+> Android 12+ 에서는 **항상** 배경화면 색이 이기므로 브랜드 색이 사실상 쓰이지 않는다.
+> 게다가 지도 핀 색은 하드코딩이라, 주변 UI 만 배경화면을 따라가면 핀과 충돌한다.
 
 | 역할 | 값 | 용도 |
 |---|---|---|

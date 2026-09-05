@@ -20,11 +20,25 @@ private val LightColors = lightColorScheme(
     onSecondary = Color.White,
     error = EmergencyRed,
     onError = Color.White,
+    tertiary = CategoryColor.Tour,
+    onTertiary = Color.White,
     surface = SurfaceLight,
     onSurface = Color(0xFF1A1C1B),
     onSurfaceVariant = Color(0xFF5A5751), // 웜 그레이 — 보조 텍스트·기준일 표기
     background = SurfaceLight,
     onBackground = Color(0xFF1A1C1B),
+    // 아래를 비워 두면 메뉴·카드가 M3 기본 보라로 나온다 (D-45).
+    surfaceVariant = SurfaceVariantLight,
+    surfaceContainerLowest = NeutralLowest,
+    surfaceContainerLow = NeutralLow,
+    surfaceContainer = Neutral,
+    surfaceContainerHigh = NeutralHigh,
+    surfaceContainerHighest = NeutralHighest,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+    inverseSurface = Color(0xFF2F312F),
+    inverseOnSurface = Color(0xFFF1EFEA),
+    inversePrimary = BrandGreenDark,
 )
 
 private val DarkColors = darkColorScheme(
@@ -36,21 +50,38 @@ private val DarkColors = darkColorScheme(
     onSecondary = Color(0xFF5A1A05),
     error = EmergencyRedDark,
     onError = Color(0xFF690005),
+    tertiary = Color(0xFF9CCBEA),
+    onTertiary = Color(0xFF00344F),
     surface = SurfaceDark,
     onSurface = Color(0xFFE2E3E0),
     onSurfaceVariant = Color(0xFFBFBDB6),
     background = SurfaceDark,
     onBackground = Color(0xFFE2E3E0),
+    surfaceVariant = SurfaceVariantDark,
+    surfaceContainerLowest = NeutralLowestDark,
+    surfaceContainerLow = NeutralLowDark,
+    surfaceContainer = NeutralDark,
+    surfaceContainerHigh = NeutralHighDark,
+    surfaceContainerHighest = NeutralHighestDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    inverseSurface = Color(0xFFE2E3E0),
+    inverseOnSurface = Color(0xFF2F312F),
+    inversePrimary = BrandGreen,
 )
 
 /**
- * Android 12+ 에서는 시스템 다이내믹 컬러를 따르고, 그 아래에서는 브랜드 팔레트로 떨어진다
- * (spec.md §6.2). 다크 모드는 필수 요구사항이다.
+ * 기본은 **브랜드 팔레트**다 (spec.md §6.2 · D-44). 다크 모드는 필수 요구사항이다.
+ *
+ * 다이내믹 컬러는 끈다. 켜면 Android 12+ 에서 배경화면 색이 이기고
+ * **브랜드 딥그린을 아무도 못 본다.** 게다가 지도 핀 색(`CategoryColor`)은 하드코딩이라
+ * 주변 UI 만 배경화면을 따라가면 핀과 충돌한다 — 보라 배경화면 + 초록·주황 핀.
+ * 켜고 싶으면 `dynamicColor = true` 를 넘기면 되지만, 그 전에 D-44 를 읽을 것.
  */
 @Composable
 fun PetAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current

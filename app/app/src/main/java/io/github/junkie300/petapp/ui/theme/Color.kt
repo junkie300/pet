@@ -10,6 +10,26 @@ val EmergencyRed = Color(0xFFD64545)        // Error — 응급·오류 전용. 
 val SurfaceLight = Color(0xFFFBFAF8)
 val SurfaceDark = Color(0xFF14181A)
 
+// Material 3 은 surface 하나만 지정하면 메뉴·카드가 쓰는 surfaceContainer 계열을
+// **기본 보라 팔레트**로 남겨 둔다. 그래서 웜 뉴트럴 램프를 직접 깔아 준다 (D-45).
+val NeutralLowest = Color(0xFFFFFFFF)
+val NeutralLow = Color(0xFFF7F5F1)
+val Neutral = Color(0xFFF2F0EB)
+val NeutralHigh = Color(0xFFECEAE5)
+val NeutralHighest = Color(0xFFE6E4DF)
+val SurfaceVariantLight = Color(0xFFE3E1DA)
+val OutlineLight = Color(0xFF7A776F)
+val OutlineVariantLight = Color(0xFFCBC8C0)
+
+val NeutralLowestDark = Color(0xFF0E1113)
+val NeutralLowDark = Color(0xFF1A1E20)
+val NeutralDark = Color(0xFF1E2224)
+val NeutralHighDark = Color(0xFF282C2E)
+val NeutralHighestDark = Color(0xFF333739)
+val SurfaceVariantDark = Color(0xFF3F4441)
+val OutlineDark = Color(0xFF8A8D88)
+val OutlineVariantDark = Color(0xFF43484A)
+
 // 다크에서는 같은 색상을 그대로 쓰면 대비가 무너진다. 밝기를 올린 짝을 따로 둔다.
 val BrandGreenDark = Color(0xFF8FD3AC)
 val BrandOrangeDark = Color(0xFFFFB59B)
