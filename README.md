@@ -41,7 +41,7 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
 
 ## 진행 상황 (2026-09-05)
 
-### 0단계 — 지역코드 정규화 ◐ LOCALDATA 만 남음
+### 0단계 — 지역코드 정규화 ✅ 완료
 
 - [x] Supabase 프로젝트 생성 (`pet-app`, 리전 Seoul), PostGIS·pg_trgm 활성화
 - [x] DB 스키마 전체 적용 — `regions` `places` `shelters` `animals` `sync_logs` + RLS + `places_nearby` RPC
@@ -49,7 +49,7 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
       → **시도 16 · 시군구 256 · 읍면동 5,067**
 - [x] 국가동물보호정보시스템 코드 매핑 (`apms_upr_cd`, `apms_org_cd`) — **미매핑 0**
 - [x] TourAPI 코드 매핑 (`tour_area_cd`, `tour_sigungu_cd`) — **미매핑 0**
-- [ ] LOCALDATA 지역코드 매핑 (`localdata_cd`) ← **2단계 미용시설에 필요. LOCALDATA 인증키 대기**
+- [x] LOCALDATA 지역코드 매핑 (`localdata_cd`) — **미매핑 0** (인증키 없이 문서만으로 처리)
 - [x] 읍면동 중심좌표 (`center_lat`, `center_lng`) — **5,067곳 전량 적재, 실패 0**
 
 ### 1단계 — 동물병원 ◐ 앱 뼈대 착수
@@ -100,7 +100,7 @@ cd D:\pet\etl
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | 전부 (반드시 **legacy `service_role`**) |
 | `DATA_GO_KR_KEY` | ✅ | `mapping` (APMS·TourAPI) |
 | `KAKAO_REST_API_KEY` | ✅ | `coords` (읍면동 중심좌표) |
-| `LOCALDATA_API_KEY` | ❌ | `localdata_cd` · 2단계 미용시설 |
+| `LOCALDATA_API_KEY` | ❌ | 2단계 미용시설 (`localdata_cd` 는 문서로 이미 끝냈다) |
 
 앱은 `.env` 가 아니라 **`app/local.properties`** 를 쓴다 (`app/local.properties.example` 참고).
 
@@ -119,7 +119,7 @@ python run.py status
 최근 ETL 이력 · 다음에 칠 명령을 한 화면에 보여준다.
 
 ```
-python -m unittest discover -s tests    # 44개 통과해야 함 (네트워크·DB 불필요)
+python -m unittest discover -s tests    # 51개 통과해야 함 (네트워크·DB 불필요)
 ```
 
 DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을 붙여넣는다.
@@ -133,6 +133,7 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 | `python run.py regions` | 법정동코드 → `regions` (**로컬 전용**, `etl/data/` 파일 필요) | Supabase |
 | `python run.py mapping` | APMS·TourAPI 지역코드 매핑 | `DATA_GO_KR_KEY` |
 | `python run.py coords --limit 50` | 읍면동 중심좌표 | `KAKAO_REST_API_KEY` |
+| `python run.py localdata` | LOCALDATA 자치단체코드 매핑 | **없음** (`etl/docs/` 엑셀) |
 
 `--dry-run` 을 붙이면 DB 에 쓰지 않는다. `mapping`·`coords` 는 GitHub Actions
 (`.github/workflows/etl.yml`)에서 수동 실행할 수도 있다 — Secrets 에 같은 이름으로 넣어둘 것.

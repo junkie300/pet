@@ -6,6 +6,7 @@
     python run.py mapping --dry-run              # 외부 코드 매핑 결과만 확인
     python run.py mapping                        # regions 에 외부 코드 반영
     python run.py coords --limit 50              # 읍면동 중심좌표 (빈 곳만, 50개씩)
+    python run.py localdata --dry-run           # LOCALDATA 자치단체코드 매핑 (인증키 불필요)
     python run.py status                         # 지금 어디까지 왔는지 (작업 재개 시 첫 명령)
 """
 
@@ -17,7 +18,7 @@ import sys
 from pathlib import Path
 
 from petetl.config import ConfigError
-from petetl.sources import coords, mapping, regions
+from petetl.sources import coords, localdata, mapping, regions
 
 
 def _setup_logging() -> None:
@@ -49,6 +50,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_coords.add_argument("--limit", type=int, default=None, help="한 번에 처리할 최대 개수")
     p_coords.add_argument("--all", action="store_true",
                           help="이미 좌표가 있는 곳도 다시 조회한다 (기본은 빈 곳만)")
+
+    p_local = sub.add_parser(
+        "localdata",
+        help="0단계: LOCALDATA 자치단체코드 매핑 (etl/docs/ 엑셀만 있으면 되고 인증키는 불필요)",
+    )
+    p_local.add_argument("--dry-run", action="store_true", help="DB 에 쓰지 않고 결과만 확인")
 
     sub.add_parser("status", help="지금 어디까지 왔는지 한 화면에 출력 (작업 재개용)")
 
@@ -94,6 +101,12 @@ def main() -> int:
 
         coords.run(client=get_client(), dry_run=args.dry_run,
                    limit=args.limit, only_missing=not args.all)
+
+    elif args.command == "localdata":
+        # 매핑과 같은 이유로 dry-run 이어도 regions 를 읽어야 한다.
+        from petetl.db import get_client
+
+        localdata.run(client=get_client(), dry_run=args.dry_run)
 
     elif args.command == "status":
         from petetl.db import get_client
