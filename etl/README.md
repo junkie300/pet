@@ -9,6 +9,7 @@ etl/
   requirements.txt
   .env.example               → .env 로 복사해서 채운다 (커밋 금지)
   data/                      원본 파일 두는 곳 (커밋 제외)
+  docs/                      API 참고문서 두는 곳 (커밋함) → etl/docs/README.md
   petetl/
     config.py                환경변수 로딩
     db.py                    Supabase 클라이언트 + 청크 upsert
