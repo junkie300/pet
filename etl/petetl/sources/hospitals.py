@@ -24,7 +24,11 @@ from .mapping import PAGE, select_all
 
 log = logging.getLogger(__name__)
 
-SOURCE = "localdata"  # 원본은 지방행정인허가데이터(LOCALDATA)다. 화면의 출처 표기도 이 이름을 쓴다.
+# places.source — 화면의 출처 표기에 쓰인다. 원본은 지방행정인허가데이터(LOCALDATA)다.
+SOURCE = "localdata"
+# sync_logs.source — 어떤 ETL 이 돌았는지 구분한다. places.source 와 같은 값을 쓰면
+# 지역코드 매핑(localdata_code)과 섞여 이력을 못 읽는다.
+SYNC_SOURCE = "animal_hospital"
 DATASET = "15154952"
 TABLE = "places"
 CATEGORY = "hospital"
@@ -297,7 +301,7 @@ def run(client=None, dry_run: bool = False, limit: int | None = None) -> list[di
         log.info("dry-run: DB 에 쓰지 않고 종료합니다.")
         return places
 
-    with SyncRun(client, SOURCE) as run_log:
+    with SyncRun(client, SYNC_SOURCE) as run_log:
         run_log.add(upsert(client, TABLE, places, on_conflict="source,source_id", chunk_size=PAGE // 2))
         log.info("총 %d행 반영", run_log.rows_upserted)
     return places

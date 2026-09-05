@@ -61,6 +61,45 @@ def _count(client, **filters) -> int:
     return query.limit(1).execute().count or 0
 
 
+def _places_count(client, **filters) -> int:
+    query = client.table("places").select("id", count="exact")
+    for key, value in filters.items():
+        if key.endswith("__notnull"):
+            query = query.not_.is_(key[: -len("__notnull")], "null")
+        elif key.endswith("__isnull"):
+            query = query.is_(key[: -len("__isnull")], "null")
+        else:
+            query = query.eq(key, value)
+    return query.limit(1).execute().count or 0
+
+
+def _places_report(client) -> list[str]:
+    """1단계 이후 상태. places 가 비어 있으면 '미착수' 한 줄로 끝낸다."""
+    total = _places_count(client)
+    lines = ["", "=== places 적재 ==="]
+    if not total:
+        lines.append("  아직 없음 → python run.py hospitals")
+        return lines
+
+    lines.append(f"  전체 {total:,}행")
+    for category, label in (("hospital", "동물병원"), ("grooming", "미용"),
+                            ("restaurant", "식당"), ("tour", "관광"),
+                            ("wildlife_center", "야생동물구조센터")):
+        n = _places_count(client, category=category)
+        if not n:
+            continue
+        open_n = _places_count(client, category=category, status="open")
+        # 실사용에 영향을 주는 것은 '영업중인데 지역이 없는' 행뿐이다 (D-51).
+        orphan = _places_count(client, category=category, status="open", region_code__isnull=None)
+        no_geo = _places_count(client, category=category, status="open", lat__isnull=None)
+        lines.append(
+            f"  {_pad(label, 18)}{n:>7,}행 · 영업중 {open_n:,}"
+            f" · 지역 미배정 {orphan}"
+            f" · 좌표 없음 {no_geo}"
+        )
+    return lines
+
+
 def _env_report() -> list[str]:
     lines = ["=== 환경 (.env) ==="]
     for name, blocked in ENV_KEYS:
@@ -113,6 +152,8 @@ def report(client) -> str:
         lines.append(f"  {_pad(label, 18)}{filled:>5,} / {denominator:,}   {mark}{suffix}")
     lines.append("  ※ apms_org_cd 의 미충족 50 = 시도 16 + 세종 34 (세종은 시군구가 없다). 정상이다.")
 
+    lines += _places_report(client)
+
     lines.append("")
     lines.append("=== 최근 ETL (sync_logs) ===")
     rows = (
@@ -131,11 +172,25 @@ def report(client) -> str:
 
     lines.append("")
     lines.append("=== 다음 명령 ===")
-    if not os.getenv("KAKAO_REST_API_KEY", "").strip():
-        lines.append("  · 카카오 REST API 키를 .env 에 넣으면 → python run.py coords --limit 50")
-    else:
-        lines.append("  · python run.py coords --limit 50   (소량 확인 후 python run.py coords)")
-    if not os.getenv("LOCALDATA_API_KEY", "").strip():
-        lines.append("  · LOCALDATA 키를 받으면 → localdata_cd 매핑 모듈 작성")
+    lines += _next_steps(client)
     lines.append("  · 자세한 순서는 README.md '다음에 할 일'")
     return "\n".join(lines)
+
+
+def _next_steps(client) -> list[str]:
+    """지금 상태에서 실제로 막혀 있는 것만 알려준다. 끝난 일을 계속 권하지 않는다."""
+    steps: list[str] = []
+
+    if _count(client, level=3, center_lat__isnull=None):
+        steps.append("  · python run.py coords          (중심좌표가 빈 읍면동이 남아 있다)")
+    # 통합시도 1행은 코드가 둘로 갈려 비는 것이 정상이다 (D-48).
+    if _count(client, localdata_cd__isnull=None) > 1:
+        steps.append("  · python run.py localdata       (자치단체코드가 빈 행이 있다)")
+    if not _places_count(client, category="hospital"):
+        steps.append("  · python run.py hospitals       (동물병원이 아직 없다)")
+
+    if not steps:
+        steps.append("  · ETL 은 할 일이 없다. 다음은 앱 화면이다 — S-00 홈 + 하단 탭 4개 (D-39)")
+        if not os.getenv("LOCALDATA_API_KEY", "").strip():
+            steps.append("  · 2단계(미용)를 시작하려면 LOCALDATA 인증키가 필요하다")
+    return steps
