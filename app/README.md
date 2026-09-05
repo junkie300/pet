@@ -22,19 +22,33 @@ Android Studio 에서 **`D:\pet\app`** 을 연다 (`D:\pet` 이 아니다).
 ## 명령
 
 ```
-gradlew testDebugUnitTest     # 단위 테스트 (기기 불필요)
+gradlew testDebugUnitTest     # 단위 테스트 22개 (기기·네트워크 불필요)
 gradlew assembleDebug         # debug APK
 gradlew installDebug          # 연결된 기기/에뮬레이터에 설치
-gradlew assembleRelease       # R8 적용 release APK (서명 없음)
+gradlew assembleRelease       # R8 적용 release APK (서명 없음, 2.67MB)
+```
+
+에뮬레이터로 확인할 때:
+
+```
+%LOCALAPPDATA%\Android\Sdk\emulator\emulator -avd <이름> -no-snapshot-load
+gradlew installDebug
+adb shell am start -n io.github.junkie300.petapp/.MainActivity
+adb exec-out screencap -p > shot.png     # 색·형태는 화면으로만 검증된다 (D-45)
 ```
 
 ## 지금 있는 것
 
 | 화면 | 상태 |
 |---|---|
-| S-01 지역 선택 | 3단 드롭다운 · 지역명 검색 · 최근 지역 3개 |
-| S-02 지도 | 없음 — 카카오 **네이티브 앱 키** 대기 |
-| S-03 장소 상세 | 없음 — `places` 적재 후 |
+| S-00 홈 허브 | 지역 칩(읍면동까지) · 카테고리 6칸 · **실제 건수** (D-39·D-53) |
+| 하단 탭 4개 | 홈 · 지도 탐색 · 구조·입양 · 더보기. 뒤 둘은 안내 화면 (D-39) |
+| S-01 지역 선택 | 3단 드롭다운 · 지역명 검색 · 최근 지역 3개. **홈의 지역 칩에서 연다** |
+| 장소 목록 | 읍면동 + 카테고리로 조회. 홈 타일에서 들어간다 |
+| S-03 장소 상세 | 주소·전화·영업상태 + **출처·기준일**. 길찾기·전화·공유 (D-57) |
+| S-07 즐겨찾기 | Room. **오프라인에서도 뜬다** (D-60) |
+| 더보기 | 즐겨찾기 · 데이터 출처 · 앱 정보 |
+| S-02 지도 | 없음 — 카카오 **네이티브 앱 키** 대기. **여기만 남았다** |
 
 ## 구조
 
@@ -42,22 +56,38 @@ gradlew assembleRelease       # R8 적용 release APK (서명 없음)
 app/src/main/java/io/github/junkie300/petapp/
   PetApplication.kt      Application. AppContainer 를 만든다
   AppContainer.kt        수동 DI. Hilt 를 쓰지 않는 이유는 spec.md §1.1
-  MainActivity.kt        Compose 진입점
+  MainActivity.kt        Compose 진입점. 화면 구성은 전부 ui/nav/PetApp.kt 안에 있다
   data/
     Region.kt              regions 행 (앱이 쓰는 컬럼만)
     RegionRepository.kt    S-01 이 쓰는 유일한 데이터 출입구
-    RecentRegionStore.kt   최근 지역 3개 (DataStore)
+    RecentRegionStore.kt   최근 지역 3개 (DataStore). **맨 앞이 현재 지역이다** (D-54)
+    Place.kt               places 행. 기준일은 날짜만 떼어 쓴다 (D-58)
+    PlaceCategory.kt       카테고리 5종 + 적재 여부(loaded) — D-53
+    PlaceRepository.kt     건수 · 목록 · 상세
     SupabaseProvider.kt    클라이언트 하나를 공유
+    favorite/              Room — FavoritePlace · FavoriteDao · PetDatabase
   ui/
-    theme/                 spec.md §6.2 컬러 · 다크 모드
+    nav/PetApp.kt          하단 탭 + NavHost. **탭 전환은 switchTab() 하나로** (D-55)
+    theme/                 spec.md §6.2 컬러 · 다크 모드 (카테고리 색은 다크 짝이 있다 — D-56)
     common/UiState.kt      로딩 / 없음 / 실패
-    region/                S-01 화면 + ViewModel
+    common/CategoryUi.kt   카테고리 라벨·아이콘·색. **세 화면이 이 표 하나를 읽는다**
+    common/DetailScaffold  탭이 아닌 화면(목록·상세·즐겨찾기)의 공통 뼈대
+    home/                  S-00 홈
+    region/                S-01 지역 선택
+    place/                 목록 · 상세 · 공용 카드 · 바깥 앱 연동
+    favorite/              S-07 즐겨찾기
+    more/                  더보기
 ```
 
 ## 알아둘 것
 
 - **버전은 `gradle/libs.versions.toml` 한 곳에서만 바꾼다.**
   AGP 8.13.2 · compileSdk 36 에 맞춰 고정돼 있다. 이유와 올리는 방법은 `DECISIONS.md` **D-36**.
+- ⚠️ **KSP 는 코틀린과 분리된 버전 라인(`2.3.11`)을 쓴다.** Kotlin 2.3.21 에는 짝이 맞는
+  `<코틀린>-<KSP>` 형식(`2.2.21-2.0.5`)이 **없다.** 올릴 때 이 라인인지 먼저 확인한다 — **D-61**.
 - **`applicationId` 는 임시값이다.** 스토어 첫 업로드 뒤에는 영구히 못 바꾼다 — `DECISIONS.md` **D-35**.
 - **로딩 · 데이터 없음 · 불러오기 실패를 한 상태로 합치지 말 것.** `ui/common/UiState.kt` 주석 참고.
-- 앱 아이콘과 서체(Pretendard)는 아직 임시다. 화면이 확정된 뒤 교체한다.
+  같은 이유로 **"이 동네에 없다(0곳)"와 "우리가 아직 안 실었다(준비 중)"도 갈라 둔다** — D-53.
+- **탭인 화면을 다른 탭 위에 push 하지 말 것.** 홈 탭을 눌렀을 때 그 화면이 되살아난다 — D-55.
+- **Room 스키마(`app/schemas/`)를 지우지 말 것.** 마이그레이션을 쓰려면 이전 스키마가 필요하다.
+- 앱 아이콘과 서체(Pretendard)는 아직 임시다. 화면이 확정됐으니 지금이 교체할 때다.

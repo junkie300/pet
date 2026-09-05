@@ -190,7 +190,7 @@ def _next_steps(client) -> list[str]:
         steps.append("  · python run.py hospitals       (동물병원이 아직 없다)")
 
     if not steps:
-        steps.append("  · ETL 은 할 일이 없다. 다음은 앱 화면이다 — S-00 홈 + 하단 탭 4개 (D-39)")
+        steps.append("  · ETL 은 할 일이 없다. 1단계 앱 화면도 지도(S-02)만 남았다 — 카카오 네이티브 앱 키 대기")
         if not os.getenv("LOCALDATA_API_KEY", "").strip():
             steps.append("  · 2단계(미용)를 시작하려면 LOCALDATA 인증키가 필요하다")
     return steps

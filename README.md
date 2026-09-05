@@ -23,7 +23,7 @@ supabase/
   apply_all.sql        위 7개를 이어붙인 것 — SQL Editor 에 한 번에 붙여넣기용
   verify.sql           스키마·적재·매핑·좌표를 한 번에 점검
 etl/                   공공데이터 → Supabase 파이썬 ETL   → etl/README.md
-  run.py                 진입점 (status · regions · mapping · coords)
+  run.py                 진입점 (status · regions · mapping · coords · localdata · hospitals)
   petetl/status.py       "지금 어디까지 왔나" 요약
   petetl/publicapi.py    공공데이터포털 공통 클라이언트
   petetl/sources/        소스별 ETL
@@ -33,15 +33,15 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
   app/src/main/java/.../
     data/                     regions·places 조회 · 최근 지역 저장
     data/PlaceCategory.kt     카테고리 5종 + **적재 여부**(loaded) — D-53
+    data/favorite/            즐겨찾기 Room 테이블 · DAO · PetDatabase
     ui/nav/PetApp.kt          하단 탭 4개 + NavHost. 탭 전환은 여기 switchTab() 하나로 — D-55
     ui/home/                  S-00 홈 허브 (지역 칩 · 카테고리 6칸 · 건수)
-    ui/place/                 장소 목록 · S-03 상세 (길찾기·전화·공유 — 키 불필요, D-57)
-    ui/favorite/              S-07 즐겨찾기 (Room · 오프라인에서도 뜬다, D-60)
-    data/favorite/            favorite_places 테이블 · DAO · PetDatabase
-    ui/common/CategoryUi.kt   카테고리 라벨·아이콘·색 — 세 화면이 이 표 하나를 읽는다
     ui/region/                S-01 지역 선택 화면
-    ui/more/                  더보기 (즐겨찾기 자리 · 데이터 출처 · 앱 정보)
+    ui/place/                 장소 목록 · S-03 상세 (길찾기·전화·공유 — 키 불필요, D-57)
+    ui/favorite/              S-07 즐겨찾기 (오프라인에서도 뜬다 — D-60)
+    ui/more/                  더보기 (즐겨찾기 · 데이터 출처 · 앱 정보)
     ui/common/UiState.kt      로딩 / 없음 / 실패를 타입으로 구분
+    ui/common/CategoryUi.kt   카테고리 라벨·아이콘·색 — 세 화면이 이 표 하나를 읽는다
 .github/workflows/     test.yml · etl.yml(mapping·coords 수동 실행 가능)
 ```
 
@@ -63,7 +63,7 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
 ### 1단계 — 동물병원 ◐ 지도(S-02)만 남았다
 
 - [x] 안드로이드 프로젝트 생성 — `app/`. **debug·release 빌드와 단위 테스트 22개 통과 확인**
-      (release APK 2.80MB — spec 의 30MB 예산 안)
+      (release APK 2.67MB — spec 의 30MB 예산 안)
 - [x] Supabase Kotlin SDK 연결. anon 키는 `local.properties` 에서 읽어 `BuildConfig` 로 넣는다
 - [x] S-01 지역 선택 — 시도→시군구→읍면동 3단 드롭다운 · 지역명 검색 · 최근 지역 3개
 - [x] 로딩 / 데이터 없음 / 불러오기 실패를 **타입으로 구분** (`UiState`) · 다크 모드
@@ -143,6 +143,17 @@ python -m unittest discover -s tests    # 72개 통과해야 함 (네트워크·
 DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을 붙여넣는다.
 스키마·RLS·계층·매핑·좌표 범위를 한 번에 점검한다.
 
+**앱 쪽은 이렇게 확인한다** (자세한 것은 [app/README.md](app/README.md)):
+
+```
+cd D:\pet\app
+gradlew testDebugUnitTest     # 22개 통과해야 함 (기기·네트워크 불필요)
+gradlew installDebug          # 에뮬레이터/기기에 설치
+```
+
+⚠️ **색·형태·화면 흐름은 빌드가 아니라 화면으로만 검증된다** (D-45·D-55·D-56 이 전부
+에뮬레이터에서 잡힌 것이다). 고쳤으면 `adb exec-out screencap -p > shot.png` 로 눈으로 본다.
+
 ### 3. 지금 있는 ETL 명령
 
 | 명령 | 하는 일 | 필요한 키 |
@@ -159,7 +170,8 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 
 ### 4. 다음에 할 일
 
-**데이터도 찼고 뼈대도 섰다. 홈에서 장소로 들어가는 길만 아직 비어 있다.**
+**1단계 화면은 지도(S-02)만 남았고 그건 키 대기다.**
+홈 → 목록 → 상세 → 즐겨찾기가 전부 실제 데이터로 이어진다.
 
 #### 지금 바로 할 수 있는 것 (대기 없음)
 
@@ -172,12 +184,13 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 
 #### 승인·발급 대기 (개발과 병행)
 
-6. **카카오 네이티브 앱 키** — 지도(S-02)에 필요. REST 키와 **같은 앱**에서 나온다
-   (developers.kakao.com > 내 애플리케이션 > **앱 키 > 네이티브 앱 키**)
-7. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 안 통한다).
+4. **카카오 네이티브 앱 키** — 지도(S-02)에 필요. REST 키와 **같은 앱**에서 나온다
+   (developers.kakao.com > 내 애플리케이션 > **앱 키 > 네이티브 앱 키**).
+   ⚠️ **길찾기에는 필요 없다** — 그건 이미 된다 (D-57)
+5. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 안 통한다).
    **2단계 미용시설**에 필요하다. `localdata_cd` 는 문서로 이미 끝냈으므로 급하지 않다
-8. **테스터 12명 명단** — 리드타임이 가장 길다 (`plan.md` §3). 개발과 무관하게 지금부터 모은다
-9. **KIPRIS 상표 조회** — 「미리펫」을 제9류(소프트웨어)·제42류(SaaS)로 확인 (D-43).
+6. **테스터 12명 명단** — 리드타임이 가장 길다 (`plan.md` §3). 개발과 무관하게 지금부터 모은다
+7. **KIPRIS 상표 조회** — 「미리펫」을 제9류(소프트웨어)·제42류(SaaS)로 확인 (D-43).
    스토어 등록 전까지만 하면 된다
 
 ### 5. 알려진 빈틈 (고쳐야 하지만 급하지 않은 것)
