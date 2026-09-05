@@ -2,6 +2,7 @@ package io.github.junkie300.petapp.ui.common
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -36,6 +37,8 @@ fun DetailScaffold(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    /** 상단바 오른쪽. 즐겨찾기처럼 화면 전체에 걸리는 동작을 둔다. */
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -75,6 +78,7 @@ fun DetailScaffold(
                         )
                     }
                 },
+                actions = actions,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,

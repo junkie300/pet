@@ -1,0 +1,59 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "07d11d9cb48f1f21c428144e3f0bf7fc",
+    "entities": [
+      {
+        "tableName": "favorite_places",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`place_id` INTEGER NOT NULL, `category` TEXT NOT NULL, `name` TEXT NOT NULL, `address` TEXT, `tel` TEXT, `saved_at` INTEGER NOT NULL, PRIMARY KEY(`place_id`))",
+        "fields": [
+          {
+            "fieldPath": "placeId",
+            "columnName": "place_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tel",
+            "columnName": "tel",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "savedAt",
+            "columnName": "saved_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "place_id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '07d11d9cb48f1f21c428144e3f0bf7fc')"
+    ]
+  }
+}

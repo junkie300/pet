@@ -71,6 +71,11 @@
 
     <!-- 더보기 -->
     <string name="more_favorites">즐겨찾기</string>
+    <!-- 실패가 아니라 "아직 담은 게 없다"이다. 즐겨찾기는 네트워크를 타지 않는다 -->
+    <string name="favorites_empty">아직 담아 둔 곳이 없습니다.
+장소 상세에서 북마크를 눌러 담아 두세요.</string>
+    <string name="cd_favorite_add">즐겨찾기에 담기</string>
+    <string name="cd_favorite_remove">즐겨찾기에서 빼기</string>
     <string name="more_sources">데이터 출처</string>
     <string name="more_source_region">지역 · 행정안전부 법정동코드</string>
     <string name="more_source_hospital">동물병원 · 행정안전부 지방행정인허가데이터</string>

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 // Supabase 접속 정보는 local.properties 에서 읽는다 (커밋되지 않는다).
@@ -88,6 +89,11 @@ android {
     }
 }
 
+// Room 스키마를 파일로 남긴다. 이게 있어야 나중에 버전을 올릴 때 마이그레이션을 쓸 수 있다.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -95,6 +101,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

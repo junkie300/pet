@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -59,6 +62,7 @@ fun PlaceDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val isFavorite by viewModel.isFavorite.collectAsStateWithLifecycle()
     val place = (state as? UiState.Success)?.data
 
     DetailScaffold(
@@ -67,6 +71,25 @@ fun PlaceDetailScreen(
             ?: stringResource(R.string.place_detail_title),
         onBack = onBack,
         modifier = modifier,
+        actions = {
+            // 장소를 못 불러왔으면 버튼도 없다 — 이름 없는 즐겨찾기를 만들지 않기 위해서다.
+            if (place != null) {
+                IconButton(onClick = viewModel::toggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = stringResource(
+                            if (isFavorite) R.string.cd_favorite_remove else R.string.cd_favorite_add,
+                        ),
+                        // 즐겨찾기는 Secondary(웜 오렌지) 자리다 (spec.md §6.2).
+                        tint = if (isFavorite) {
+                            MaterialTheme.colorScheme.secondary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+        },
     ) { insets ->
         val bodyModifier = Modifier
             .padding(insets)

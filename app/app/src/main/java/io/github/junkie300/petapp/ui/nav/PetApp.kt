@@ -35,6 +35,8 @@ import io.github.junkie300.petapp.AppContainer
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.ComingSoonScreen
+import io.github.junkie300.petapp.ui.favorite.FavoritesScreen
+import io.github.junkie300.petapp.ui.favorite.FavoritesViewModel
 import io.github.junkie300.petapp.ui.home.HomeCategory
 import io.github.junkie300.petapp.ui.home.HomeScreen
 import io.github.junkie300.petapp.ui.home.HomeViewModel
@@ -77,6 +79,9 @@ private val MAP_ROUTE_PATTERN = "${PetTab.MAP.route}?$ARG_CATEGORY={$ARG_CATEGOR
 private const val ARG_PLACE_ID = "placeId"
 private val PLACES_ROUTE_PATTERN = "places/{$ARG_CATEGORY}"
 private val PLACE_DETAIL_ROUTE_PATTERN = "place/{$ARG_PLACE_ID}"
+
+/** S-07 즐겨찾기. 더보기에서 여는 화면이며 탭이 아니다. */
+private const val ROUTE_FAVORITES = "favorites"
 
 @Composable
 fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
@@ -167,7 +172,11 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
             ) { entry ->
                 val placeId = entry.arguments?.getLong(ARG_PLACE_ID) ?: 0L
                 val viewModel: PlaceDetailViewModel = viewModel(
-                    factory = PlaceDetailViewModel.factory(placeId, container.placeRepository),
+                    factory = PlaceDetailViewModel.factory(
+                        placeId,
+                        container.placeRepository,
+                        container.favoriteDao,
+                    ),
                 )
                 PlaceDetailScreen(
                     viewModel = viewModel,
@@ -204,7 +213,20 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                 )
             }
 
-            composable(PetTab.MORE.route) { MoreScreen() }
+            composable(PetTab.MORE.route) {
+                MoreScreen(onFavoritesClick = { navController.navigate(ROUTE_FAVORITES) })
+            }
+
+            composable(ROUTE_FAVORITES) {
+                val viewModel: FavoritesViewModel = viewModel(
+                    factory = FavoritesViewModel.factory(container.favoriteDao),
+                )
+                FavoritesScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onPlaceClick = { placeId -> navController.navigate("place/$placeId") },
+                )
+            }
         }
     }
 }

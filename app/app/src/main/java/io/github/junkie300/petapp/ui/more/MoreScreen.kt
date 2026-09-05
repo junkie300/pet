@@ -1,6 +1,7 @@
 package io.github.junkie300.petapp.ui.more
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,7 +40,7 @@ import io.github.junkie300.petapp.ui.theme.Spacing
  * (개발계획서 §8.1 · spec.md §8), 나중에 붙이는 것으로 미룰 성질이 아니다.
  */
 @Composable
-fun MoreScreen(modifier: Modifier = Modifier) {
+fun MoreScreen(onFavoritesClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -54,7 +56,7 @@ fun MoreScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.primary,
         )
 
-        SectionCard {
+        SectionCard(onClick = onFavoritesClick) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -71,10 +73,11 @@ fun MoreScreen(modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = stringResource(R.string.home_count_pending),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -124,12 +127,14 @@ fun MoreScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SectionCard(content: @Composable () -> Unit) {
+private fun SectionCard(onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
     Card(
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         Column(
             modifier = Modifier.padding(Spacing.cardPadding),
