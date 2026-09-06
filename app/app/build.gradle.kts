@@ -63,6 +63,11 @@ android {
         // service_role 키는 절대 여기 넣지 않는다 (spec.md §1.2).
         buildConfigField("String", "SUPABASE_URL", "\"${secret("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("SUPABASE_ANON_KEY")}\"")
+
+        // 카카오 네이티브 앱 키도 APK 에 박혀 배포되는 공개 키다 (D-69). 안전은 키를 숨겨서가
+        // 아니라 콘솔에 등록된 **패키지명 + 키 해시** 대조로 지킨다. 비어 있어도 빌드는 되고,
+        // 지도만 안내 문구로 바뀐다 (spec.md §1.2).
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"${secret("KAKAO_NATIVE_APP_KEY")}\"")
     }
 
     buildTypes {
@@ -116,6 +121,8 @@ dependencies {
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.postgrest)
     implementation(libs.ktor.client.okhttp)
+
+    implementation(libs.kakao.maps)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

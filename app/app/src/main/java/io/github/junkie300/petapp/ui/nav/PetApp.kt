@@ -37,9 +37,9 @@ import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.ComingSoonScreen
 import io.github.junkie300.petapp.ui.favorite.FavoritesScreen
 import io.github.junkie300.petapp.ui.favorite.FavoritesViewModel
-import io.github.junkie300.petapp.ui.home.HomeCategory
 import io.github.junkie300.petapp.ui.home.HomeScreen
 import io.github.junkie300.petapp.ui.home.HomeViewModel
+import io.github.junkie300.petapp.ui.map.MapScreen
 import io.github.junkie300.petapp.ui.more.MoreScreen
 import io.github.junkie300.petapp.ui.place.PlaceDetailScreen
 import io.github.junkie300.petapp.ui.place.PlaceDetailViewModel
@@ -194,14 +194,24 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     },
                 ),
             ) { entry ->
+                // 카테고리 없이 들어오면 지금 적재된 것 중 첫 번째를 연다. 필터 칩이 붙기 전까지의 기본값이다.
                 val category = PlaceCategory.fromDbValue(entry.arguments?.getString(ARG_CATEGORY))
-                ComingSoonScreen(
-                    icon = PetTab.MAP.icon,
-                    title = stringResource(R.string.coming_soon_map_title),
-                    body = stringResource(R.string.coming_soon_map_body),
-                    note = category?.let {
-                        stringResource(R.string.coming_soon_map_chosen, stringResource(HomeCategory.of(it).labelRes))
-                    },
+                    ?: PlaceCategory.loadedEntries.firstOrNull()
+                    ?: PlaceCategory.HOSPITAL
+                // 지도와 목록은 같은 조회를 쓴다 (D-26). 카테고리가 바뀌면 다른 ViewModel 이어야 하므로
+                // key 를 준다 — 안 주면 처음 연 카테고리의 것이 그대로 되살아난다.
+                val viewModel: PlaceListViewModel = viewModel(
+                    key = category.dbValue,
+                    factory = PlaceListViewModel.factory(
+                        category,
+                        container.regionRepository,
+                        container.placeRepository,
+                        container.recentRegionStore,
+                    ),
+                )
+                MapScreen(
+                    viewModel = viewModel,
+                    onPlaceClick = { placeId -> navController.navigate("place/$placeId") },
                 )
             }
 

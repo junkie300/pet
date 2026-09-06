@@ -29,7 +29,7 @@ Android Studio 에서 **`D:\pet\app`** 을 연다 (`D:\pet` 이 아니다).
 gradlew testDebugUnitTest     # 단위 테스트 33개 (기기·네트워크 불필요)
 gradlew assembleDebug         # debug APK
 gradlew installDebug          # 연결된 기기/에뮬레이터에 설치
-gradlew assembleRelease       # R8 적용 release APK (서명 없음, 5.79MB)
+gradlew assembleRelease       # R8 적용 release APK (서명 없음, 43.8MB — 유니버설. AAB 는 기기당 23~26MB · D-72)
 ```
 
 에뮬레이터로 확인할 때:
@@ -41,19 +41,24 @@ adb shell am start -n io.github.junkie300.petapp/.MainActivity
 adb exec-out screencap -p > shot.png     # 색·형태는 화면으로만 검증된다 (D-45)
 ```
 
+⚠️ **지도는 에뮬레이터로 볼 수 없다.** 카카오맵 SDK 가 **ARM 빌드만** 배포해서 x86_64
+에뮬레이터에서는 지도 탭이 "이 기기에서는 지도를 열 수 없습니다"로 뜬다 (D-71).
+지도를 확인하려면 **안드로이드 폰을 USB 로 연결**하고 `gradlew installDebug` 를 쓴다.
+나머지 화면은 에뮬레이터로 그대로 확인된다.
+
 ## 지금 있는 것
 
 | 화면 | 상태 |
 |---|---|
 | S-00 홈 허브 | 지역 칩(읍면동까지) · 카테고리 6칸 · **실제 건수** (D-39·D-53) |
-| 하단 탭 4개 | 홈 · 지도 탐색 · 구조·입양 · 더보기. 뒤 둘은 안내 화면 (D-39) |
+| 하단 탭 4개 | 홈 · 지도 탐색 · 구조·입양 · 더보기. 구조·입양만 안내 화면 (D-39) |
 | S-01 지역 선택 | 3단 드롭다운 · 지역명 검색 · 최근 지역 3개. **홈의 지역 칩에서 연다** |
 | 장소 목록 | 읍면동 + 카테고리로 조회. 홈 타일에서 들어간다 |
 | S-03 장소 상세 | 주소·전화·영업상태 + **출처·기준일**. 길찾기·전화·공유 (D-57) |
 | S-07 즐겨찾기 | Room. **오프라인에서도 뜬다** (D-60). 상세까지 열린다 (D-64) |
 | 오프라인 | 지역·장소·건수 사본 + 상단 배너. 홈·목록·상세·S-01 전부 (D-62~D-66) |
 | 더보기 | 즐겨찾기 · 데이터 출처 · 앱 정보 |
-| S-02 지도 | 없음 — 카카오 **네이티브 앱 키** 대기. **여기만 남았다** |
+| S-02 지도 | ① 카카오맵 + 핀 + 핀 탭 → 상세. **화면 확인은 실기기 대기** (D-70·D-71) |
 
 ## 구조
 
@@ -77,6 +82,8 @@ app/src/main/java/io/github/junkie300/petapp/
     favorite/              Room — FavoritePlace · FavoriteDao. 스냅샷에 출처·기준일까지 (D-64)
   ui/
     nav/PetApp.kt          하단 탭 + NavHost. **탭 전환은 switchTab() 하나로** (D-55)
+    map/KakaoMapProvider.kt  SDK 초기화. 실패해도 앱을 죽이지 않는다 (D-71)
+    map/MapScreen.kt         S-02 지도. 목록과 **같은 ViewModel** 을 본다 (D-70)
     theme/                 spec.md §6.2 컬러 · 다크 모드 (카테고리 색은 다크 짝이 있다 — D-56)
     theme/Type.kt          Pretendard 가변 폰트 · tabularFigures() — D-67·D-68
     common/UiState.kt      로딩 / 없음 / 실패

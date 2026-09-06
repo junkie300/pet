@@ -1407,3 +1407,72 @@ Pretendard 는 KS X 1001 서브셋판(`PretendardStd`)도 따로 낸다. 그런�
 카카오 개발자 콘솔이 개편됐다. 지금은 **[앱] > [플랫폼 키] > [네이티브 앱 키]** 화면 안에서
 패키지명·키 해시를 넣는다. 앱 목록은 https://developers.kakao.com/console/app 이며 **로그인해야**
 보인다. 옛 블로그·문서의 경로를 따라가면 메뉴를 찾지 못한다.
+
+
+---
+
+### 39. 지도(S-02) ① — SDK 연동과 핀 (2026-09-06)
+
+키가 풀렸으므로 1단계의 마지막 화면을 시작했다. 한 번에 다 만들지 않고 **① 지도 + 핀 →
+② 바텀시트 3단 → ③ 카테고리 필터 칩 → ④ 클러스터링** 으로 나눴고, 여기까지가 ① 이다.
+
+**D-70. 카카오맵 SDK 는 `com.kakao.maps.open:android` 2.15.1 을 카카오 저장소에서 받는다.**
+
+Maven Central 에 없다. `settings.gradle.kts` 의 `dependencyResolutionManagement` 에
+`https://devrepo.kakao.com/nexus/content/groups/public/` 를 더했다. 버전은 카탈로그
+(`libs.versions.toml`)에만 적는다 — 의존성 버전을 두 곳에 두지 않는다.
+
+- → **지도와 목록은 같은 `PlaceListViewModel` 을 쓴다.** 둘은 "이 동네의 이 카테고리"라는
+  **같은 질문의 두 가지 그림**이라 조회를 두 벌 만들 이유가 없다 (D-26). 바텀시트가 붙을 때
+  목록과 지도가 서로 다른 값을 보고 있으면 그때 가서 고칠 수 없다.
+- → 핀은 **드로어블 한 장을 카테고리 색으로 tint** 해서 만든다(`ic_map_pin.xml`). 색깔별
+  파일을 두면 2단계에서 카테고리를 늘릴 때 그림부터 늘어난다.
+  ⚠️ 지도 바탕은 테마와 무관하게 밝으므로 **라이트 기준 5색**을 쓴다 (D-56 의 반대 방향).
+- → 핀에 `LabelOptions.setTag(place.id)` 로 장소 id 를 매달았다. 핀을 눌렀을 때 어느 장소인지
+  되찾는 유일한 끈이다. 탭하면 이미 있는 S-03 상세로 간다.
+- → **좌표가 없는 장소는 핀이 될 수 없다.** 조용히 빼면 목록의 "총 N곳"과 지도의 개수가
+  어긋난다 → 그럴 때 상단 알림이 `좌표 없는 N곳은 지도에 없습니다` 라고 적는다.
+- → **R8 keep 규칙을 우리가 적었다.** AAR 에 consumer proguard 규칙이 없다(실측). 네이티브가
+  자바 클래스를 이름으로 찾으므로 이름이 바뀌면 **release 에서만** 지도가 죽는다.
+
+**D-71. 카카오맵 SDK 는 ARM 전용이다. SDK 초기화 실패로 앱을 죽이지 않는다.**
+
+AAR 이 담고 있는 네이티브 라이브러리는 `arm64-v8a` 와 `armeabi-v7a` **둘뿐**이다.
+x86/x86_64 는 없다. 그래서 이 PC 의 에뮬레이터(x86_64)에서 앱이 **켜지자마자** 죽었다:
+
+```
+java.lang.UnsatisfiedLinkError: dlopen failed: library "libK3fAndroid.so" not found
+    at com.kakao.vectormap.KakaoMapSdk.init(KakaoMapSdk.java:57)
+    at io.github.junkie300.petapp.PetApplication.onCreate(PetApplication.kt:14)
+```
+
+⚠️ **지도 하나 때문에 앱 전체가 못 켜졌다.** `Application.onCreate` 에서 터졌기 때문이다.
+
+- → `KakaoMapSdk.init` 을 `runCatching` 으로 감싸고 실패 사유를 `KakaoMapProvider.startupError`
+  에 남긴다. 지도 탭만 "이 기기에서는 지도를 열 수 없습니다"로 바뀌고 **나머지 화면은 그대로 돈다.**
+  키가 없는 것(`isConfigured == false`)과 **SDK 를 못 올린 것**은 화면에서 다른 말을 한다 —
+  고칠 사람이 볼 곳이 서로 다르기 때문이다 (spec.md §1.2 · §5.3 과 같은 정신).
+- → ⚠️ **이 프로젝트에서 지도만은 에뮬레이터로 검증할 수 없다.** 색·형태·화면 흐름은 화면으로만
+  검증된다는 규칙(D-45)이 지도에서는 **실기기(ARM)** 를 요구한다. x86 PC 에서 arm64 이미지를
+  돌리는 것은 전체 에뮬레이션이라 지도 렌더링에 쓸 만한 속도가 나오지 않는다.
+
+**[실측] 에뮬레이터(x86_64, android-33) 2026-09-06**
+
+| 확인한 것 | 결과 |
+|---|---|
+| 앱 실행 | 정상. 홈·목록·상세·즐겨찾기 모두 그대로다 |
+| 지도 탭 | "이 기기에서는 지도를 열 수 없습니다" + 사유 한 줄 (`libK3fAndroid.so not found`) |
+| 단위 테스트 | 33개 통과 |
+| 지도·핀 자체 | **미확인** — 실기기에서 봐야 한다 |
+
+**D-72. 30MB 예산은 유니버설 APK 가 아니라 AAB 기준으로 지킨다.**
+
+release APK 가 **5.79MB → 43.8MB** 로 뛰었다. 지도 네이티브 라이브러리 두 벌 때문이다
+(압축 기준 arm64 18.1MB + armeabi-v7a 15.9MB).
+
+- → **Play 에는 AAB 로 올린다.** Play 가 기기 ABI 별로 쪼개 주므로 실제 내려받는 크기는
+  **기기당 약 23~26MB** 다(41.7MB − 안 쓰는 ABI). 예산 30MB 안에 들어온다.
+- → `abiFilters` 로 `armeabi-v7a` 를 잘라내면 유니버설도 26MB 로 줄지만 **32비트 전용 기기가
+  탈락한다.** AAB 로 해결되는 문제를 기기 배제로 풀지 않는다.
+- → ⚠️ 앞으로 **APK 크기를 말할 때는 어느 쪽인지 함께 적는다.** 유니버설 APK 숫자만 보고
+  "예산 초과"라고 판단하면 있지도 않은 문제를 고치게 된다.

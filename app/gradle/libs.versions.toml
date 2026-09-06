@@ -15,6 +15,7 @@ ktor = "3.5.2"
 junit = "4.13.2"
 coroutines = "1.10.2"
 room = "2.8.4"
+kakaoMaps = "2.15.1"
 ksp = "2.3.11"
 
 [libraries]
@@ -38,6 +39,8 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
 supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+kakao-maps = { group = "com.kakao.maps.open", name = "android", version.ref = "kakaoMaps" }
+
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }

@@ -32,11 +32,22 @@
     <string name="category_adoption">입양 친구들</string>
 
     <!-- 아직 안 만든 탭. 빈 화면 대신 무엇을 기다리는지 적는다. -->
-    <string name="coming_soon_map_title">지도는 준비 중입니다</string>
-    <string name="coming_soon_map_body">카카오맵 네이티브 앱 키가 들어오면 열립니다.\n동물병원 데이터는 이미 전국 분량이 들어와 있습니다.</string>
-    <string name="coming_soon_map_chosen">고른 카테고리 · %1$s</string>
     <string name="coming_soon_adoption_title">구조·입양은 아직입니다</string>
     <string name="coming_soon_adoption_body">국가동물보호정보시스템 연동이 끝나면\n보호 중인 동물과 보호센터가 여기 들어옵니다.</string>
+
+    <!-- S-02 지도. 키가 없어도 앱은 돈다 — 지도만 이 안내로 바뀐다 (spec.md §1.2 · D-69) -->
+    <string name="map_no_key_title">지도 키가 없습니다</string>
+    <string name="map_no_key_body">local.properties 에 KAKAO_NATIVE_APP_KEY 를 넣으면 지도가 열립니다.\n다른 화면은 그대로 쓸 수 있습니다.</string>
+    <string name="map_loading">장소를 불러오는 중</string>
+    <!-- 카카오맵 SDK 는 ARM 빌드만 배포한다. x86_64 기기·에뮬레이터에서는 지도를 못 연다 (D-71) -->
+    <string name="map_unsupported_title">이 기기에서는 지도를 열 수 없습니다</string>
+    <string name="map_unsupported_body">카카오맵은 ARM 기기에서만 동작합니다.\n지도 외의 화면은 그대로 쓸 수 있습니다.</string>
+
+    <!-- ⚠️ 이 문구가 보이면 코드보다 콘솔의 패키지명·키 해시를 먼저 본다 (D-69) -->
+    <string name="map_error">지도를 열지 못했습니다 · %1$s\n카카오 콘솔에 패키지명과 키 해시가 등록됐는지 확인하세요.</string>
+    <string name="map_summary">%1$s · %2$s %3$d곳</string>
+    <!-- 좌표가 없어 핀이 못 되는 장소가 있다. 조용히 빼면 목록의 건수와 어긋난다 -->
+    <string name="map_summary_missing_coords">%1$s · %2$s %3$d곳 · 좌표 없는 %4$d곳은 지도에 없습니다</string>
 
     <!-- 장소 목록 · S-03 상세 -->
     <string name="cd_back">뒤로</string>

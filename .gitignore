@@ -6,6 +6,7 @@ venv/
 
 # 비밀값
 .env
+이태우메모(건드리지말것).txt
 *.keystore
 *.jks
 local.properties
@@ -20,3 +21,6 @@ captures/
 # OS
 Thumbs.db
 .DS_Store
+
+# 화면 확인용 스크린샷 (D-45)
+shot*.png
