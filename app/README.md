@@ -15,9 +15,13 @@ Android Studio 에서 **`D:\pet\app`** 을 연다 (`D:\pet` 이 아니다).
 | `sdk.dir` | Android SDK 경로. Studio 로 열면 자동으로 채워진다 |
 | `SUPABASE_URL` | 프로젝트 URL |
 | `SUPABASE_ANON_KEY` | ⚠️ **`anon` (public) 키.** `service_role` 을 넣으면 APK 에 그대로 노출된다 |
+| `KAKAO_NATIVE_APP_KEY` | 지도(S-02) 전용. 길찾기·전화는 이 키 없이도 된다 (D-57) |
 
 키가 비어 있어도 **앱은 켜진다.** 데이터 대신 "접속 정보가 설정되지 않았습니다" 안내가 뜬다.
 빌드가 깨지는 것과 키가 없는 것을 구분하기 위해서다.
+
+⚠️ **카카오 키는 값이 맞아도 콘솔 등록이 어긋나면 지도만 까맣게 뜬다.** 빌드는 성공한다.
+검은 화면을 보면 코드보다 **콘솔의 패키지명·키 해시부터** 대조한다 — `DECISIONS.md` **D-69**.
 
 ## 명령
 
