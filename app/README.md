@@ -25,7 +25,7 @@ Android Studio 에서 **`D:\pet\app`** 을 연다 (`D:\pet` 이 아니다).
 gradlew testDebugUnitTest     # 단위 테스트 33개 (기기·네트워크 불필요)
 gradlew assembleDebug         # debug APK
 gradlew installDebug          # 연결된 기기/에뮬레이터에 설치
-gradlew assembleRelease       # R8 적용 release APK (서명 없음, 2.82MB)
+gradlew assembleRelease       # R8 적용 release APK (서명 없음, 5.79MB)
 ```
 
 에뮬레이터로 확인할 때:
@@ -74,6 +74,7 @@ app/src/main/java/io/github/junkie300/petapp/
   ui/
     nav/PetApp.kt          하단 탭 + NavHost. **탭 전환은 switchTab() 하나로** (D-55)
     theme/                 spec.md §6.2 컬러 · 다크 모드 (카테고리 색은 다크 짝이 있다 — D-56)
+    theme/Type.kt          Pretendard 가변 폰트 · tabularFigures() — D-67·D-68
     common/UiState.kt      로딩 / 없음 / 실패
     common/CategoryUi.kt   카테고리 라벨·아이콘·색. **세 화면이 이 표 하나를 읽는다**
     common/OfflineBanner   "언제 받아 둔 정보인지" 한 줄. 오류색을 쓰지 않는다 (D-66)
@@ -101,4 +102,8 @@ app/src/main/java/io/github/junkie300/petapp/
   절대 안 드러난다 — **D-65**. 즐겨찾기는 `fallbackToDestructiveMigration()` 으로 날리지 않는다.
 - **빈 사본은 "없다"가 아니라 캐시 미스다.** 오프라인에서 빈 목록을 성공으로 돌려주면 화면이
   "이 지역에는 없습니다"를 그리는데, 우리는 모르는 것이다 — **D-62**.
-- 앱 아이콘과 서체(Pretendard)는 아직 임시다. 화면이 확정됐으니 지금이 교체할 때다.
+- **서체는 가변 폰트 파일 하나(`res/font/pretendard_variable.ttf`)로 굵기를 전부 낸다** — D-67.
+  ⚠️ **서브셋을 만들지 말 것.** 장소명은 공공데이터에서 오므로 어떤 음절이 나올지 모르고,
+  한 글자만 빠져도 병원 이름에 두부(□)가 뜬다 — D-68. 서체를 바꾸면 `.gitattributes` 의
+  `*.ttf binary` 도 확인한다.
+- **앱 아이콘은 아직 임시다.** 남은 임시값은 이제 이것 하나다.

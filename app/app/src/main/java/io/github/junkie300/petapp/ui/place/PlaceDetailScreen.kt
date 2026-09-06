@@ -48,6 +48,7 @@ import io.github.junkie300.petapp.ui.common.labelRes
 import io.github.junkie300.petapp.ui.theme.CardShape
 import io.github.junkie300.petapp.ui.theme.PillShape
 import io.github.junkie300.petapp.ui.theme.Spacing
+import io.github.junkie300.petapp.ui.theme.tabularFigures
 
 /**
  * S-03 장소 상세 (spec.md §5.2).
@@ -225,7 +226,7 @@ private fun InfoCard(place: Place, modifier: Modifier = Modifier) {
         ) {
             InfoRow(stringResource(R.string.place_field_address_road), place.addressRoad)
             InfoRow(stringResource(R.string.place_field_address_jibun), place.addressJibun)
-            InfoRow(stringResource(R.string.place_field_tel), place.tel)
+            InfoRow(stringResource(R.string.place_field_tel), place.tel, tabular = true)
             // 원본이 쓰는 문구를 그대로 옮긴다. 우리가 "영업중"으로 고쳐 부르지 않는다.
             InfoRow(stringResource(R.string.place_field_status), place.salesStatus)
         }
@@ -234,7 +235,7 @@ private fun InfoCard(place: Place, modifier: Modifier = Modifier) {
 
 /** 값이 없는 줄은 아예 그리지 않는다. 빈 칸을 보여 주면 "정보가 있는데 못 불러왔나" 로 읽힌다. */
 @Composable
-private fun InfoRow(label: String, value: String?) {
+private fun InfoRow(label: String, value: String?, tabular: Boolean = false) {
     if (value.isNullOrBlank()) return
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
@@ -242,7 +243,11 @@ private fun InfoRow(label: String, value: String?) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(text = value, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = value,
+            // 전화번호만 자리 폭을 맞춘다. 주소에 걸면 번지수 숫자만 벌어져 보인다 (spec.md §6.3)
+            style = MaterialTheme.typography.bodyLarge.let { if (tabular) it.tabularFigures() else it },
+        )
     }
 }
 

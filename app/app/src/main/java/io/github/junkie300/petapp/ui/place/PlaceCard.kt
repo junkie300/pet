@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.CategoryBadge
 import io.github.junkie300.petapp.ui.theme.CardShape
+import io.github.junkie300.petapp.ui.theme.tabularFigures
 import io.github.junkie300.petapp.ui.theme.Spacing
 
 /**
@@ -74,7 +75,8 @@ fun PlaceCard(
                 if (!tel.isNullOrBlank()) {
                     Text(
                         text = tel,
-                        style = MaterialTheme.typography.bodyMedium,
+                        // 전화번호는 자리 폭을 맞춘다 — 카드가 세로로 늘어서기 때문이다 (spec.md §6.3)
+                        style = MaterialTheme.typography.bodyMedium.tabularFigures(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

@@ -29,6 +29,7 @@ import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.toUiState
 import io.github.junkie300.petapp.ui.place.PlaceCard
 import io.github.junkie300.petapp.ui.theme.Spacing
+import io.github.junkie300.petapp.ui.theme.tabularFigures
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -96,7 +97,7 @@ fun FavoritesScreen(
                 item {
                     Text(
                         text = stringResource(R.string.place_list_count, current.data.size),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.tabularFigures(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )

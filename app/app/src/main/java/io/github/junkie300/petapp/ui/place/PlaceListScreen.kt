@@ -28,6 +28,7 @@ import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.labelRes
 import io.github.junkie300.petapp.ui.theme.Spacing
+import io.github.junkie300.petapp.ui.theme.tabularFigures
 
 /**
  * 장소 목록 — 고른 읍면동의 한 카테고리를 목록으로 보여준다.
@@ -139,7 +140,7 @@ private fun PlaceListBody(
             item {
                 Text(
                     text = stringResource(R.string.place_list_count, places.data.size),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.tabularFigures(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )

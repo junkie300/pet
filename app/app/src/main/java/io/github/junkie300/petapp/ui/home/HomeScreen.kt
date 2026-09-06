@@ -42,6 +42,7 @@ import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.theme.CardShape
 import io.github.junkie300.petapp.ui.theme.PillShape
 import io.github.junkie300.petapp.ui.theme.Spacing
+import io.github.junkie300.petapp.ui.theme.tabularFigures
 
 /**
  * S-00 홈 허브 (spec.md §5.2 · D-39).
@@ -260,7 +261,8 @@ private fun CountLabel(category: HomeCategory, state: HomeUiState, modifier: Mod
         is UiState.Loading -> SkeletonBox(width = 48.dp, height = COUNT_LINE_HEIGHT, modifier = modifier)
         is UiState.Success -> Text(
             text = stringResource(R.string.home_count, counts.data[category.place] ?: 0),
-            style = MaterialTheme.typography.titleMedium,
+            // 그리드 두 칸의 숫자가 나란히 서므로 자리 폭을 맞춘다 (spec.md §6.3)
+            style = MaterialTheme.typography.titleMedium.tabularFigures(),
             fontWeight = FontWeight.Bold,
             color = category.tint(),
             modifier = modifier,

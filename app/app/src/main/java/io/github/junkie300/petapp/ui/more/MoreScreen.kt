@@ -122,6 +122,13 @@ fun MoreScreen(onFavoritesClick: () -> Unit, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // SIL OFL 1.1 은 저작권 표시를 함께 배포할 것을 요구한다. 전문은 앱 안에 넣어 두었다
+            // (assets/licenses/pretendard_ofl.txt).
+            Text(
+                text = stringResource(R.string.more_font_license),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -6,6 +6,9 @@ gradlew text eol=lf
 *.sh text eol=lf
 
 *.jar binary
+# 서체는 바이너리다. text=auto 의 추측에 맡기면 줄바꿈 변환으로 깨질 수 있다.
+*.ttf binary
+*.otf binary
 *.png binary
 *.keystore binary
 *.jks binary

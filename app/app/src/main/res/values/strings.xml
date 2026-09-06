@@ -82,6 +82,8 @@
     <string name="more_source_note">장소별 기준일은 각 장소 상세에서 확인할 수 있습니다.</string>
     <string name="more_app_info">앱 정보</string>
     <string name="more_version">버전 %1$s</string>
+    <!-- 서체는 SIL OFL 1.1 이다. 저작권 표시를 함께 배포해야 한다 — 전문은 assets/licenses/ 에 있다 -->
+    <string name="more_font_license">서체 Pretendard · SIL Open Font License 1.1</string>
 
     <!-- S-01 지역 선택 -->
     <string name="region_picker_title">지역 선택</string>
