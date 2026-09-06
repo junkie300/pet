@@ -48,6 +48,8 @@
     <string name="map_summary">%1$s · %2$s %3$d곳</string>
     <!-- 좌표가 없어 핀이 못 되는 장소가 있다. 조용히 빼면 목록의 건수와 어긋난다 -->
     <string name="map_summary_missing_coords">%1$s · %2$s %3$d곳 · 좌표 없는 %4$d곳은 지도에 없습니다</string>
+    <!-- 바텀시트 손잡이. 끌어서 3단(peek·half·full), 눌러도 다음 단으로 간다 -->
+    <string name="cd_sheet_handle">목록 펼치기</string>
 
     <!-- 장소 목록 · S-03 상세 -->
     <string name="cd_back">뒤로</string>

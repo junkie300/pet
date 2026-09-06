@@ -24,6 +24,9 @@ val PillShape = RoundedCornerShape(percent = 50)
 /** 카드 곡률. `PetShapes.large` 와 같은 값이지만 카드에 쓸 때 의도를 드러낸다. */
 val CardShape = RoundedCornerShape(20.dp)
 
+/** 지도 바텀시트(S-02). 아래는 화면 밖으로 나가므로 **위 두 모서리만** 둥글다. */
+val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+
 object Spacing {
     val screenHorizontal = 20.dp
     val sectionGap = 24.dp

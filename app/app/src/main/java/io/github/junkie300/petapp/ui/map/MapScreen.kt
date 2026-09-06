@@ -2,12 +2,15 @@ package io.github.junkie300.petapp.ui.map
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,6 +33,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.DrawableCompat
@@ -51,15 +57,19 @@ import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.ComingSoonScreen
+import io.github.junkie300.petapp.ui.common.EmptyMessage
 import io.github.junkie300.petapp.ui.common.FailedMessage
 import io.github.junkie300.petapp.ui.common.OfflineBanner
+import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.labelRes
 import io.github.junkie300.petapp.ui.place.PlaceListUiState
 import io.github.junkie300.petapp.ui.place.PlaceListViewModel
+import io.github.junkie300.petapp.ui.place.placeItems
 import io.github.junkie300.petapp.ui.theme.CategoryColor
 import io.github.junkie300.petapp.ui.theme.PillShape
 import io.github.junkie300.petapp.ui.theme.Spacing
+import kotlin.math.roundToInt
 
 /**
  * S-02 장소 지도 — 고른 읍면동의 장소를 핀으로 찍는다 (spec.md §5.2).
@@ -114,19 +124,47 @@ fun MapScreen(
     // 지도가 검게 뜨는 사고는 예외도 로그도 분명하지 않다 (D-69). 받은 메시지를 화면에 그대로 적는다.
     var mapError by remember { mutableStateOf<String?>(null) }
 
-    // 상단 알림이 지도를 가린다. 그만큼을 지도에 알려 줘야 핀이 알림 뒤로 들어가지 않는다.
+    // 상단 알림이 지도를 가린다. 그만큼을 지도에 알려 줘야 핀이 알림 뒤로 들어가지 않는다 (D-73).
     var noticeHeightPx by remember { mutableIntStateOf(0) }
 
-    Box(modifier.fillMaxSize()) {
+    // 지도에서 고른 핀. 시트에서 그 카드가 강조된다. **상세로 바로 가지 않는다** — 핀 하나를
+    // 누른 것으로 화면을 통째로 바꾸면 지도를 훑어보던 맥락이 끊긴다 (D-74).
+    var selectedPlaceId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    val sheetState = rememberPlaceSheetState()
+    val listState = rememberLazyListState()
+
+    // 지역이 바뀌면 그전에 고른 핀은 이 목록에 없다. 그때만 지운다.
+    // ⚠️ "지역 코드가 바뀌면 지운다"로 쓰면 안 된다 — 상세에 다녀오는 사이 지역이 잠시
+    // null 이 되었다가 돌아오므로, 돌아올 때마다 선택이 사라진다(실측).
+    LaunchedEffect(places) {
+        if (places.isNotEmpty() && places.none { it.id == selectedPlaceId }) selectedPlaceId = null
+    }
+
+    LaunchedEffect(selectedPlaceId, places) {
+        val index = places.indexOfFirst { it.id == selectedPlaceId }
+        if (index < 0) return@LaunchedEffect
+        // peek 은 목록이 거의 안 보인다. 핀을 눌렀으면 최소한 half 까지는 올려 준다.
+        if (sheetState.settledValue == SheetDetent.PEEK) sheetState.animateTo(SheetDetent.HALF)
+        listState.animateScrollToItem(index)
+    }
+
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val containerHeightPx = constraints.maxHeight.toFloat()
+        // 시트가 아래를 덮는 만큼도 지도에 알려 준다. 안 그러면 아래쪽 핀이 시트 뒤에 숨는다.
+        val sheetInsetPx = (containerHeightPx * SheetDetent.PEEK.visibleFraction).roundToInt()
+
         MapCanvas(
             center = regionCenter,
             pins = pins,
             topInsetPx = noticeHeightPx,
-            onPinClick = onPlaceClick,
+            bottomInsetPx = sheetInsetPx,
+            onPinClick = { placeId -> selectedPlaceId = placeId },
             onMapError = { mapError = it.message ?: it.javaClass.simpleName },
             modifier = Modifier.fillMaxSize(),
         )
 
+        // 상단에는 **지도에 관한 것**만 얹는다. 목록의 상태는 시트가 말한다.
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
@@ -136,45 +174,75 @@ fun MapScreen(
                 .onSizeChanged { noticeHeightPx = it.height },
         ) {
             ready?.cachedAt?.let { OfflineBanner(cachedAt = it) }
+            mapError?.let { error ->
+                MapNotice(text = stringResource(R.string.map_error, error), emphasis = true)
+            }
+        }
 
-            val currentError = mapError
+        PlaceSheet(
+            state = sheetState,
+            containerHeightPx = containerHeightPx,
+            listState = listState,
+            header = {
+                SheetHeader(
+                    title = when {
+                        state is PlaceListUiState.NoRegion -> stringResource(R.string.place_list_no_region)
+                        region == null -> stringResource(R.string.map_loading)
+                        // 좌표가 없는 장소는 핀이 될 수 없다. 조용히 빼면 목록의 건수와 어긋난다.
+                        pins.size != places.size -> stringResource(
+                            R.string.map_summary_missing_coords,
+                            region.fullName,
+                            categoryName,
+                            pins.size,
+                            places.size - pins.size,
+                        )
+
+                        else -> stringResource(
+                            R.string.map_summary,
+                            region.fullName,
+                            categoryName,
+                            places.size,
+                        )
+                    },
+                )
+            },
+        ) {
             when {
-                currentError != null -> MapNotice(
-                    text = stringResource(R.string.map_error, currentError),
-                    emphasis = true,
-                )
+                state is PlaceListUiState.NoRegion -> Unit
 
-                state is PlaceListUiState.NoRegion ->
-                    MapNotice(text = stringResource(R.string.place_list_no_region))
+                state is PlaceListUiState.Failed ->
+                    item { FailedMessage(onRetry = viewModel::retry) }
 
-                state is PlaceListUiState.Loading || ready?.places is UiState.Loading ->
-                    MapNotice(text = stringResource(R.string.map_loading))
+                ready == null || ready.places is UiState.Loading ->
+                    item { SkeletonRows(count = 4) }
 
-                state is PlaceListUiState.Failed || ready?.places is UiState.Failed ->
-                    MapNotice { FailedMessage(onRetry = viewModel::retry) }
+                ready.places is UiState.Failed ->
+                    item { FailedMessage(onRetry = viewModel::retry) }
 
-                // 좌표가 없는 장소는 핀이 될 수 없다. 조용히 빼면 "몇 곳"이 화면마다 달라진다.
-                pins.size != places.size -> MapNotice(
-                    text = stringResource(
-                        R.string.map_summary_missing_coords,
-                        region?.fullName.orEmpty(),
-                        categoryName,
-                        pins.size,
-                        places.size - pins.size,
-                    ),
-                )
+                ready.places is UiState.Empty ->
+                    item { EmptyMessage(text = stringResource(R.string.place_list_empty, categoryName)) }
 
-                else -> MapNotice(
-                    text = stringResource(
-                        R.string.map_summary,
-                        region?.fullName.orEmpty(),
-                        categoryName,
-                        pins.size,
-                    ),
+                else -> placeItems(
+                    places = places,
+                    onPlaceClick = { place -> onPlaceClick(place.id) },
+                    selectedId = selectedPlaceId,
                 )
             }
         }
     }
+}
+
+/** 시트 머리말 — 지금 무엇을 보고 있는지 한 줄. 시트가 peek 이어도 이건 보인다. */
+@Composable
+private fun SheetHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 /** 지도 위에 얹는 알림 한 칸. 지도가 배경이므로 반드시 불투명한 판 위에 올린다. */
@@ -231,6 +299,8 @@ private fun MapCanvas(
     pins: List<MapPin>,
     /** 상단 알림에 가려지는 높이(px). 카메라가 이만큼을 빼고 화면을 잡는다. */
     topInsetPx: Int,
+    /** 바텀시트에 가려지는 높이(px). 같은 이유로 아래쪽도 빼 준다. */
+    bottomInsetPx: Int,
     onPinClick: (Long) -> Unit,
     onMapError: (Exception) -> Unit,
     modifier: Modifier = Modifier,
@@ -297,8 +367,8 @@ private fun MapCanvas(
 
     // 지도에게 "이만큼은 가려져 있다"고 알려 준다. 이걸 안 하면 fitMapPoints 가 잡아 준 위쪽
     // 핀이 상단 알림 뒤로 들어간다 — 화면으로 보기 전에는 드러나지 않는 종류의 어긋남이다.
-    LaunchedEffect(kakaoMap, topInsetPx) {
-        kakaoMap?.setPadding(0, topInsetPx, 0, 0)
+    LaunchedEffect(kakaoMap, topInsetPx, bottomInsetPx) {
+        kakaoMap?.setPadding(0, topInsetPx, 0, bottomInsetPx)
     }
 
     // 핀은 지도가 준비된 뒤에만 그릴 수 있다. 목록이 바뀌면 통째로 다시 그린다 — 한 읍면동의

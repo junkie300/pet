@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -145,15 +144,8 @@ private fun PlaceListBody(
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
-            items(places.data, key = { it.id }) { place ->
-                PlaceCard(
-                    name = place.name,
-                    address = place.address,
-                    category = place.placeCategory,
-                    tel = place.tel,
-                    onClick = { onPlaceClick(place) },
-                )
-            }
+            // 지도 바텀시트와 **같은 항목 코드**를 쓴다 (D-26).
+            placeItems(places = places.data, onPlaceClick = onPlaceClick)
         }
     }
 }

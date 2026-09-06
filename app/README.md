@@ -58,7 +58,7 @@ adb exec-out screencap -p > shot.png     # 색·형태는 화면으로만 검증
 | S-07 즐겨찾기 | Room. **오프라인에서도 뜬다** (D-60). 상세까지 열린다 (D-64) |
 | 오프라인 | 지역·장소·건수 사본 + 상단 배너. 홈·목록·상세·S-01 전부 (D-62~D-66) |
 | 더보기 | 즐겨찾기 · 데이터 출처 · 앱 정보 |
-| S-02 지도 | ① 카카오맵 + 핀 + 핀 탭 → 상세. **실기기 확인 완료** (D-70·D-73). ②~④ 남음 |
+| S-02 지도 | 카카오맵 + 핀 + **바텀시트 3단**(peek/half/full). 핀 탭 → 시트에서 강조 (D-70·D-73~D-75) |
 
 ## 구조
 
@@ -84,6 +84,8 @@ app/src/main/java/io/github/junkie300/petapp/
     nav/PetApp.kt          하단 탭 + NavHost. **탭 전환은 switchTab() 하나로** (D-55)
     map/KakaoMapProvider.kt  SDK 초기화. 실패해도 앱을 죽이지 않는다 (D-71)
     map/MapScreen.kt         S-02 지도. 목록과 **같은 ViewModel** 을 본다 (D-70)
+    map/MapSheet.kt          바텀시트 3단. 목록 스크롤과 드래그를 nestedScroll 로 나눈다 (D-74)
+    place/PlaceItems.kt      목록 항목. **목록 화면과 시트가 같이 쓴다** (D-26)
     theme/                 spec.md §6.2 컬러 · 다크 모드 (카테고리 색은 다크 짝이 있다 — D-56)
     theme/Type.kt          Pretendard 가변 폰트 · tabularFigures() — D-67·D-68
     common/UiState.kt      로딩 / 없음 / 실패
