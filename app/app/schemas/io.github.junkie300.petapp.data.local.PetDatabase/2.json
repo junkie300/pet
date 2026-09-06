@@ -1,0 +1,313 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "73cbac13ce72b456d4ab65cfaa0c6e34",
+    "entities": [
+      {
+        "tableName": "favorite_places",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`place_id` INTEGER NOT NULL, `category` TEXT NOT NULL, `name` TEXT NOT NULL, `address` TEXT, `tel` TEXT, `saved_at` INTEGER NOT NULL, `source` TEXT, `address_road` TEXT, `address_jibun` TEXT, `lat` REAL, `lng` REAL, `status` TEXT, `extra` TEXT, `source_updated_at` TEXT, PRIMARY KEY(`place_id`))",
+        "fields": [
+          {
+            "fieldPath": "placeId",
+            "columnName": "place_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tel",
+            "columnName": "tel",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "savedAt",
+            "columnName": "saved_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "addressRoad",
+            "columnName": "address_road",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "addressJibun",
+            "columnName": "address_jibun",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lng",
+            "columnName": "lng",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "extra",
+            "columnName": "extra",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceUpdatedAt",
+            "columnName": "source_updated_at",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "place_id"
+          ]
+        }
+      },
+      {
+        "tableName": "cached_regions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`code` TEXT NOT NULL, `level` INTEGER NOT NULL, `parent_code` TEXT, `full_name` TEXT NOT NULL, `sido_name` TEXT NOT NULL, `sigungu_name` TEXT, `dong_name` TEXT, `center_lat` REAL, `center_lng` REAL, `cached_at` INTEGER NOT NULL, PRIMARY KEY(`code`))",
+        "fields": [
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "level",
+            "columnName": "level",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentCode",
+            "columnName": "parent_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fullName",
+            "columnName": "full_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sidoName",
+            "columnName": "sido_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sigunguName",
+            "columnName": "sigungu_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dongName",
+            "columnName": "dong_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "centerLat",
+            "columnName": "center_lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "centerLng",
+            "columnName": "center_lng",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "cachedAt",
+            "columnName": "cached_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "code"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_cached_regions_parent_code",
+            "unique": false,
+            "columnNames": [
+              "parent_code"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_cached_regions_parent_code` ON `${TABLE_NAME}` (`parent_code`)"
+          }
+        ]
+      },
+      {
+        "tableName": "cached_places",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`place_id` INTEGER NOT NULL, `region_code` TEXT, `category` TEXT NOT NULL, `source` TEXT NOT NULL, `name` TEXT NOT NULL, `tel` TEXT, `address_road` TEXT, `address_jibun` TEXT, `lat` REAL, `lng` REAL, `status` TEXT NOT NULL, `extra` TEXT, `source_updated_at` TEXT, `cached_at` INTEGER NOT NULL, PRIMARY KEY(`place_id`))",
+        "fields": [
+          {
+            "fieldPath": "placeId",
+            "columnName": "place_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "regionCode",
+            "columnName": "region_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tel",
+            "columnName": "tel",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "addressRoad",
+            "columnName": "address_road",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "addressJibun",
+            "columnName": "address_jibun",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lng",
+            "columnName": "lng",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extra",
+            "columnName": "extra",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceUpdatedAt",
+            "columnName": "source_updated_at",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cachedAt",
+            "columnName": "cached_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "place_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_cached_places_region_code",
+            "unique": false,
+            "columnNames": [
+              "region_code"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_cached_places_region_code` ON `${TABLE_NAME}` (`region_code`)"
+          }
+        ]
+      },
+      {
+        "tableName": "cached_counts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`region_code` TEXT NOT NULL, `category` TEXT NOT NULL, `count` INTEGER NOT NULL, `cached_at` INTEGER NOT NULL, PRIMARY KEY(`region_code`, `category`))",
+        "fields": [
+          {
+            "fieldPath": "regionCode",
+            "columnName": "region_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "count",
+            "columnName": "count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cachedAt",
+            "columnName": "cached_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "region_code",
+            "category"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '73cbac13ce72b456d4ab65cfaa0c6e34')"
+    ]
+  }
+}

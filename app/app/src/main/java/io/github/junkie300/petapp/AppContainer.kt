@@ -5,8 +5,9 @@ import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.RecentRegionStore
 import io.github.junkie300.petapp.data.RegionRepository
 import io.github.junkie300.petapp.data.SupabaseProvider
+import io.github.junkie300.petapp.data.cache.CacheDao
 import io.github.junkie300.petapp.data.favorite.FavoriteDao
-import io.github.junkie300.petapp.data.favorite.PetDatabase
+import io.github.junkie300.petapp.data.local.PetDatabase
 
 /**
  * 수동 DI 컨테이너.
@@ -16,11 +17,14 @@ import io.github.junkie300.petapp.data.favorite.PetDatabase
  */
 class AppContainer(context: Context) {
     val isConfigured: Boolean = SupabaseProvider.isConfigured
-    val regionRepository: RegionRepository by lazy { RegionRepository(SupabaseProvider.client) }
-    val placeRepository: PlaceRepository by lazy { PlaceRepository(SupabaseProvider.client) }
-    val recentRegionStore: RecentRegionStore = RecentRegionStore(context.applicationContext)
 
-    // 즐겨찾기는 Supabase 가 아니라 로컬 DB 에 있다. 로그인이 없기 때문이다 (spec.md §5.2 S-07).
+    // 로컬 DB 하나에 **사용자가 만든 것**(즐겨찾기)과 **받아 둔 사본**(오프라인 캐시)이 함께 있다.
+    // 즐겨찾기가 Supabase 가 아니라 여기 있는 것은 로그인이 없기 때문이다 (spec.md §5.2 S-07).
     private val database: PetDatabase by lazy { PetDatabase.create(context.applicationContext) }
     val favoriteDao: FavoriteDao by lazy { database.favorites() }
+    private val cacheDao: CacheDao by lazy { database.cache() }
+
+    val regionRepository: RegionRepository by lazy { RegionRepository(SupabaseProvider.client, cacheDao) }
+    val placeRepository: PlaceRepository by lazy { PlaceRepository(SupabaseProvider.client, cacheDao) }
+    val recentRegionStore: RecentRegionStore = RecentRegionStore(context.applicationContext)
 }

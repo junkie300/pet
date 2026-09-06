@@ -7,6 +7,7 @@ import io.github.junkie300.petapp.ui.home.HomeCategory
 import io.github.junkie300.petapp.ui.home.HomeUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -58,6 +59,22 @@ class HomeViewModelTest {
         val counts = ready.counts
         assertEquals(UiState.Success(mapOf(PlaceCategory.HOSPITAL to 0)), counts)
         assertEquals(0, (counts as UiState.Success).data[PlaceCategory.HOSPITAL])
+    }
+
+    /**
+     * 오프라인 배너는 **화면이 사본으로 그려졌을 때만** 뜬다 (spec.md §5.3).
+     * 기본값이 null 이라는 것은 "지금 받은 값"이 기본이라는 뜻이다 — 배너가 잘못 뜨면
+     * 멀쩡한 정보를 낡은 것으로 보이게 만든다.
+     */
+    @Test
+    fun `사본으로 그린 화면만 받아 둔 시각을 들고 있다`() {
+        val fresh = HomeUiState.Ready(yeonnam, UiState.Success(mapOf(PlaceCategory.HOSPITAL to 8)))
+        assertNull(fresh.cachedAt)
+
+        val cached = fresh.copy(cachedAt = 1_000L)
+        assertEquals(1_000L, cached.cachedAt)
+        // 값 자체는 사본이든 아니든 똑같이 그린다. 다른 것은 배너 한 줄뿐이다.
+        assertEquals(fresh.counts, cached.counts)
     }
 
     /** 그리드는 6칸이고, 그중 입양만 places 가 아니다 (spec.md §5.1). */

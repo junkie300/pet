@@ -41,6 +41,7 @@ import io.github.junkie300.petapp.ui.common.CategoryBadge
 import io.github.junkie300.petapp.ui.common.DetailScaffold
 import io.github.junkie300.petapp.ui.common.EmptyMessage
 import io.github.junkie300.petapp.ui.common.FailedMessage
+import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.labelRes
@@ -63,7 +64,7 @@ fun PlaceDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val isFavorite by viewModel.isFavorite.collectAsStateWithLifecycle()
-    val place = (state as? UiState.Success)?.data
+    val place = (state as? UiState.Success)?.data?.place
 
     DetailScaffold(
         // 상단바에는 카테고리만. 장소 이름은 본문 머리말이 맡는다 — 둘 다 쓰면 같은 말이 두 번 나온다.
@@ -100,13 +101,14 @@ fun PlaceDetailScreen(
             // 폐업으로 빠졌거나 옛 id 다. 불러오기 실패와 다른 말이어야 한다.
             is UiState.Empty -> EmptyMessage(stringResource(R.string.place_detail_gone), bodyModifier)
             is UiState.Failed -> FailedMessage(onRetry = viewModel::load, modifier = bodyModifier)
-            is UiState.Success -> DetailBody(place = current.data, modifier = bodyModifier)
+            is UiState.Success -> DetailBody(detail = current.data, modifier = bodyModifier)
         }
     }
 }
 
 @Composable
-private fun DetailBody(place: Place, modifier: Modifier = Modifier) {
+private fun DetailBody(detail: PlaceDetail, modifier: Modifier = Modifier) {
+    val place = detail.place
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -114,6 +116,10 @@ private fun DetailBody(place: Place, modifier: Modifier = Modifier) {
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.itemGap),
     ) {
+        // 사본으로 그린 상세다. 아래 출처·기준일은 **원본 기준일**이고 이건 **받아 둔 시각**이라,
+        // 둘은 다른 값이며 둘 다 있어야 "언제 것인지"가 온전해진다.
+        detail.cachedAt?.let { OfflineBanner(cachedAt = it) }
+
         place.placeCategory?.let { CategoryBadge(it) }
 
         Text(

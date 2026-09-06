@@ -22,10 +22,10 @@ Android Studio 에서 **`D:\pet\app`** 을 연다 (`D:\pet` 이 아니다).
 ## 명령
 
 ```
-gradlew testDebugUnitTest     # 단위 테스트 22개 (기기·네트워크 불필요)
+gradlew testDebugUnitTest     # 단위 테스트 33개 (기기·네트워크 불필요)
 gradlew assembleDebug         # debug APK
 gradlew installDebug          # 연결된 기기/에뮬레이터에 설치
-gradlew assembleRelease       # R8 적용 release APK (서명 없음, 2.67MB)
+gradlew assembleRelease       # R8 적용 release APK (서명 없음, 2.82MB)
 ```
 
 에뮬레이터로 확인할 때:
@@ -46,7 +46,8 @@ adb exec-out screencap -p > shot.png     # 색·형태는 화면으로만 검증
 | S-01 지역 선택 | 3단 드롭다운 · 지역명 검색 · 최근 지역 3개. **홈의 지역 칩에서 연다** |
 | 장소 목록 | 읍면동 + 카테고리로 조회. 홈 타일에서 들어간다 |
 | S-03 장소 상세 | 주소·전화·영업상태 + **출처·기준일**. 길찾기·전화·공유 (D-57) |
-| S-07 즐겨찾기 | Room. **오프라인에서도 뜬다** (D-60) |
+| S-07 즐겨찾기 | Room. **오프라인에서도 뜬다** (D-60). 상세까지 열린다 (D-64) |
+| 오프라인 | 지역·장소·건수 사본 + 상단 배너. 홈·목록·상세·S-01 전부 (D-62~D-66) |
 | 더보기 | 즐겨찾기 · 데이터 출처 · 앱 정보 |
 | S-02 지도 | 없음 — 카카오 **네이티브 앱 키** 대기. **여기만 남았다** |
 
@@ -65,12 +66,17 @@ app/src/main/java/io/github/junkie300/petapp/
     PlaceCategory.kt       카테고리 5종 + 적재 여부(loaded) — D-53
     PlaceRepository.kt     건수 · 목록 · 상세
     SupabaseProvider.kt    클라이언트 하나를 공유
-    favorite/              Room — FavoritePlace · FavoriteDao · PetDatabase
+    Fetched.kt             값 + **어디서 왔는지**(cachedAt). 배너가 이걸 본다
+    OfflineCache.kt        서버 → 사본 남기기 → 실패하면 사본 꺼내기. **규칙 한 곳** (D-62)
+    cache/                 CachedRegion · CachedPlace · CachedCount · CacheDao
+    local/PetDatabase.kt   Room DB(버전 2). **마이그레이션 SQL 은 여기** (D-65)
+    favorite/              Room — FavoritePlace · FavoriteDao. 스냅샷에 출처·기준일까지 (D-64)
   ui/
     nav/PetApp.kt          하단 탭 + NavHost. **탭 전환은 switchTab() 하나로** (D-55)
     theme/                 spec.md §6.2 컬러 · 다크 모드 (카테고리 색은 다크 짝이 있다 — D-56)
     common/UiState.kt      로딩 / 없음 / 실패
     common/CategoryUi.kt   카테고리 라벨·아이콘·색. **세 화면이 이 표 하나를 읽는다**
+    common/OfflineBanner   "언제 받아 둔 정보인지" 한 줄. 오류색을 쓰지 않는다 (D-66)
     common/DetailScaffold  탭이 아닌 화면(목록·상세·즐겨찾기)의 공통 뼈대
     home/                  S-00 홈
     region/                S-01 지역 선택
@@ -90,4 +96,9 @@ app/src/main/java/io/github/junkie300/petapp/
   같은 이유로 **"이 동네에 없다(0곳)"와 "우리가 아직 안 실었다(준비 중)"도 갈라 둔다** — D-53.
 - **탭인 화면을 다른 탭 위에 push 하지 말 것.** 홈 탭을 눌렀을 때 그 화면이 되살아난다 — D-55.
 - **Room 스키마(`app/schemas/`)를 지우지 말 것.** 마이그레이션을 쓰려면 이전 스키마가 필요하다.
+- ⚠️ **DB 버전을 올렸으면 `MigrationSqlTest` 를 반드시 통과시킬 것.** 손으로 쓴 CREATE 문이
+  Room 이 만드는 것과 한 글자만 달라도 **버전 1 을 깔아 둔 기기에서만** 죽는다. 새로 깐 기기에서는
+  절대 안 드러난다 — **D-65**. 즐겨찾기는 `fallbackToDestructiveMigration()` 으로 날리지 않는다.
+- **빈 사본은 "없다"가 아니라 캐시 미스다.** 오프라인에서 빈 목록을 성공으로 돌려주면 화면이
+  "이 지역에는 없습니다"를 그리는데, 우리는 모르는 것이다 — **D-62**.
 - 앱 아이콘과 서체(Pretendard)는 아직 임시다. 화면이 확정됐으니 지금이 교체할 때다.

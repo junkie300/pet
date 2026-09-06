@@ -8,6 +8,7 @@ import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.RecentRegionStore
 import io.github.junkie300.petapp.data.Region
 import io.github.junkie300.petapp.data.RegionRepository
+import io.github.junkie300.petapp.data.oldestCachedAt
 import io.github.junkie300.petapp.ui.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,11 @@ sealed interface HomeUiState {
          * 적재 안 된 카테고리는 애초에 이 맵에 없다 ([PlaceCategory.loaded]).
          */
         val counts: UiState<Map<PlaceCategory, Int>>,
+        /**
+         * null 이 아니면 이 화면은 **받아 둔 사본**으로 그린 것이고, 그 시각이 이 값이다.
+         * 화면 위에 오프라인 배너가 뜬다 (spec.md §5.3).
+         */
+        val cachedAt: Long? = null,
     ) : HomeUiState
 }
 
@@ -79,16 +85,26 @@ class HomeViewModel(
             return
         }
         _state.value = HomeUiState.Loading
-        val region = runCatching { regions.byCodes(listOf(code)) }.getOrNull()?.firstOrNull()
+        // 網이 끊겨도 한 번 본 지역이면 사본으로 이름이 나온다 (RegionRepository).
+        val fetchedRegion = runCatching { regions.byCodes(listOf(code)) }.getOrNull()
+        val region = fetchedRegion?.data?.firstOrNull()
         if (region == null) {
             _state.value = HomeUiState.Failed(code)
             return
         }
         // 지역 이름을 먼저 띄운다. 건수를 기다리느라 지역 칩까지 비워 두지 않는다.
-        _state.value = HomeUiState.Ready(region, UiState.Loading)
-        val counts = runCatching { places.countsByCategory(region.code) }
-            .fold(onSuccess = { UiState.Success(it) }, onFailure = { UiState.Failed(it) })
-        _state.value = HomeUiState.Ready(region, counts)
+        _state.value = HomeUiState.Ready(region, UiState.Loading, fetchedRegion.cachedAt)
+        _state.value = runCatching { places.countsByCategory(region.code) }.fold(
+            onSuccess = { counts ->
+                // 지역과 건수 중 **더 오래된 쪽**이 이 화면의 기준이다. 둘 다 지금 것이면 null 이다.
+                HomeUiState.Ready(
+                    region = region,
+                    counts = UiState.Success(counts.data),
+                    cachedAt = oldestCachedAt(fetchedRegion.cachedAt, counts.cachedAt),
+                )
+            },
+            onFailure = { HomeUiState.Ready(region, UiState.Failed(it), fetchedRegion.cachedAt) },
+        )
     }
 
     companion object {

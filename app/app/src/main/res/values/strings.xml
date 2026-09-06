@@ -99,6 +99,9 @@
 
     <string name="state_empty_regions">해당하는 지역이 없습니다</string>
     <string name="state_failed">정보를 불러오지 못했습니다</string>
+    <!-- 오프라인 배너 (spec.md §5.3). **언제 받아 둔 것인지까지 적는다** — 기준일을 적어 신뢰를
+         얻는 앱에서 캐시로 그린 화면만 시각이 없으면 그 약속이 화면마다 어긋난다 -->
+    <string name="state_offline">오프라인 · %1$s 에 받아 둔 정보</string>
     <string name="state_retry">다시 시도</string>
     <string name="state_not_configured">Supabase 접속 정보가 설정되지 않았습니다.\nlocal.properties 에 SUPABASE_URL 과 SUPABASE_ANON_KEY 를 넣으세요.</string>
 </resources>

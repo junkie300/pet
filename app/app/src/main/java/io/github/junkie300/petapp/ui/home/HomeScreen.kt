@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.FailedMessage
+import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonBox
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.theme.CardShape
@@ -71,6 +72,9 @@ fun HomeScreen(
             .padding(horizontal = Spacing.screenHorizontal, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap),
     ) {
+        // 網이 끊긴 채로 사본을 그리고 있으면 맨 위에 말해 준다 (spec.md §5.3).
+        (state as? HomeUiState.Ready)?.cachedAt?.let { OfflineBanner(cachedAt = it) }
+
         RegionChip(state = state, onClick = onRegionClick)
 
         Text(

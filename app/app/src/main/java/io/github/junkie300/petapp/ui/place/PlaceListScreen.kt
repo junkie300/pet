@@ -23,6 +23,7 @@ import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.ui.common.DetailScaffold
 import io.github.junkie300.petapp.ui.common.EmptyMessage
 import io.github.junkie300.petapp.ui.common.FailedMessage
+import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.labelRes
@@ -77,6 +78,7 @@ fun PlaceListScreen(
 
             is PlaceListUiState.Ready -> PlaceListBody(
                 places = (state as PlaceListUiState.Ready).places,
+                cachedAt = (state as PlaceListUiState.Ready).cachedAt,
                 categoryName = categoryName,
                 contentPadding = insets,
                 onRetry = viewModel::retry,
@@ -89,6 +91,8 @@ fun PlaceListScreen(
 @Composable
 private fun PlaceListBody(
     places: UiState<List<Place>>,
+    /** null 이 아니면 이 목록은 받아 둔 사본이다. 실패·빈 목록에는 사본이 없다 — 그건 캐시 미스다. */
+    cachedAt: Long?,
     categoryName: String,
     contentPadding: PaddingValues,
     onRetry: () -> Unit,
@@ -129,6 +133,9 @@ private fun PlaceListBody(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.itemGap),
         ) {
+            cachedAt?.let { moment ->
+                item { OfflineBanner(cachedAt = moment, modifier = Modifier.padding(bottom = 8.dp)) }
+            }
             item {
                 Text(
                     text = stringResource(R.string.place_list_count, places.data.size),

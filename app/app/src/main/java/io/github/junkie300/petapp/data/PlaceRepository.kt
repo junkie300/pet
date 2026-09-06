@@ -5,6 +5,9 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Count
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.junkie300.petapp.data.cache.CacheDao
+import io.github.junkie300.petapp.data.cache.CachedCount
+import io.github.junkie300.petapp.data.cache.CachedPlace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -15,8 +18,11 @@ import kotlinx.coroutines.withContext
  * places 조회 (spec.md §4). 홈의 건수 · 목록 · 상세가 모두 여기를 지난다.
  *
  * 카테고리별로 화면을 나누지 않는다 — 한 테이블·한 화면 코드가 이 프로젝트의 재사용 전략이다 (D-26).
+ *
+ * 세 조회 모두 **성공하면 사본을 남기고 실패하면 사본을 꺼낸다** ([fetchOrCached]).
+ * 그래서 반환값이 [Fetched] 다 — 화면이 오프라인 배너를 띄우려면 값이 어디서 왔는지 알아야 한다.
  */
-class PlaceRepository(private val client: SupabaseClient) {
+class PlaceRepository(private val client: SupabaseClient, private val cache: CacheDao) {
 
     /**
      * 선택한 읍면동의 **영업중** 장소를 카테고리별로 센다 (S-00 홈).
@@ -27,12 +33,32 @@ class PlaceRepository(private val client: SupabaseClient) {
      *
      * 적재 안 된 카테고리는 아예 묻지 않는다 — [PlaceCategory.loaded] 참고.
      */
-    suspend fun countsByCategory(regionCode: String): Map<PlaceCategory, Int> = coroutineScope {
-        PlaceCategory.loadedEntries
-            .map { category -> async { category to countIn(regionCode, category) } }
-            .awaitAll()
-            .toMap()
-    }
+    suspend fun countsByCategory(regionCode: String): Fetched<Map<PlaceCategory, Int>> = fetchOrCached(
+        remote = {
+            coroutineScope {
+                PlaceCategory.loadedEntries
+                    .map { category -> async { category to countIn(regionCode, category) } }
+                    .awaitAll()
+                    .toMap()
+            }
+        },
+        store = { counts ->
+            val now = System.currentTimeMillis()
+            cache.putCounts(counts.map { (category, n) -> CachedCount(regionCode, category.dbValue, n, now) })
+        },
+        cached = {
+            val rows = cache.countsIn(regionCode)
+            if (rows.isEmpty()) {
+                null
+            } else {
+                // 모르는 카테고리가 남아 있을 수 있다 (ENUM 이 늘었다가 줄면). 그건 버린다.
+                val counts = rows.mapNotNull { row ->
+                    PlaceCategory.fromDbValue(row.category)?.let { it to row.count }
+                }.toMap()
+                Fetched(counts, rows.minOf { it.cachedAt })
+            }
+        },
+    )
 
     /**
      * 한 읍면동의 한 카테고리 목록 (S-02 목록).
@@ -44,18 +70,48 @@ class PlaceRepository(private val client: SupabaseClient) {
         regionCode: String,
         category: PlaceCategory,
         limit: Int = LIST_LIMIT,
-    ): List<Place> = query {
-        filter {
-            eq("region_code", regionCode)
-            eq("category", category.dbValue)
-            eq("status", STATUS_OPEN)
-        }
-        order("name", Order.ASCENDING)
-        limit(limit.toLong())
-    }
+    ): Fetched<List<Place>> = fetchOrCached(
+        remote = {
+            query {
+                filter {
+                    eq("region_code", regionCode)
+                    eq("category", category.dbValue)
+                    eq("status", STATUS_OPEN)
+                }
+                order("name", Order.ASCENDING)
+                limit(limit.toLong())
+            }
+        },
+        store = { places ->
+            val now = System.currentTimeMillis()
+            cache.replacePlacesIn(
+                regionCode = regionCode,
+                category = category.dbValue,
+                places = places.map { CachedPlace.from(it, regionCode, now) },
+            )
+        },
+        cached = {
+            val rows = cache.placesIn(regionCode, category.dbValue)
+            // 빈 사본은 "없다"가 아니라 "모른다"다. 실패로 둔다.
+            if (rows.isEmpty()) null else Fetched(rows.map { it.toPlace() }, rows.minOf { it.cachedAt })
+        },
+    )
 
     /** 장소 상세 (S-03). 사라진 id 일 수 있으므로 null 이 날 수 있다. */
-    suspend fun byId(id: Long): Place? = query { filter { eq("id", id) } }.firstOrNull()
+    suspend fun byId(id: Long): Fetched<Place?> = fetchOrCached(
+        remote = { query { filter { eq("id", id) } }.firstOrNull() },
+        store = { place ->
+            if (place == null) {
+                // 서버가 "그런 장소 없다"고 답했다. 사본을 남겨 두면 오프라인에서 되살아난다.
+                cache.deletePlace(id)
+            } else {
+                // 상세 조회는 region_code 를 주지 않는다. 목록 캐시가 이미 아는 값을 지우지 않는다.
+                val regionCode = cache.placeById(id)?.regionCode
+                cache.putPlaces(listOf(CachedPlace.from(place, regionCode, System.currentTimeMillis())))
+            }
+        },
+        cached = { cache.placeById(id)?.let { Fetched(it.toPlace(), it.cachedAt) } },
+    )
 
     private suspend fun countIn(regionCode: String, category: PlaceCategory): Int =
         withContext(Dispatchers.IO) {

@@ -22,4 +22,11 @@ interface FavoriteDao {
 
     @Query("DELETE FROM favorite_places WHERE place_id = :placeId")
     suspend fun remove(placeId: Long)
+
+    /**
+     * 담아 둔 스냅샷 한 줄. **오프라인에서 상세를 여는 마지막 수단**이다 —
+     * 서버도 캐시도 못 주면 여기서 꺼낸다 ([FavoritePlace.toPlace]).
+     */
+    @Query("SELECT * FROM favorite_places WHERE place_id = :placeId")
+    suspend fun byId(placeId: Long): FavoritePlace?
 }

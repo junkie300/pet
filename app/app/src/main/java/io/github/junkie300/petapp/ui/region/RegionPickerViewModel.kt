@@ -3,6 +3,7 @@ package io.github.junkie300.petapp.ui.region
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.junkie300.petapp.data.Fetched
 import io.github.junkie300.petapp.data.RecentRegionStore
 import io.github.junkie300.petapp.data.Region
 import io.github.junkie300.petapp.data.RegionRepository
@@ -27,6 +28,11 @@ data class RegionPickerUiState(
     val selectedDong: Region? = null,
     val searchKeyword: String = "",
     val searchResult: UiState<List<Region>>? = null, // null = 검색 중이 아님
+    /**
+     * 마지막으로 성공한 조회가 **받아 둔 사본**이었으면 그 시각. 오프라인 배너가 이걸 본다.
+     * 서버에서 새로 받으면 null 로 돌아간다 — 網이 살아나면 배너도 사라져야 한다.
+     */
+    val cachedAt: Long? = null,
 ) {
     /** 하위 단계는 상위가 선택됐을 때만 열린다 (spec.md §5.2). */
     val sigunguEnabled: Boolean get() = selectedSido != null
@@ -44,26 +50,52 @@ class RegionPickerViewModel(
 
     private var searchJob: Job? = null
 
+    /** 마지막으로 읽은 최근 지역 코드. [retry] 가 이름을 다시 불러올 때 쓴다. */
+    private var recentCodes: List<String> = emptyList()
+
     init {
         loadSido()
         observeRecent()
     }
 
+    /**
+     * 화면 전체 다시 시도.
+     *
+     * ⚠️ **시도 목록만 다시 부르면 안 된다.** 오프라인으로 앱을 켠 뒤 網이 살아나도
+     * 최근 지역 칩이 안 돌아오던 것이 그 때문이었다 — 칩은 `recentStore.codes` 가 바뀔 때만
+     * 다시 그려지는데, 코드는 그대로라 흐름이 다시 흐르지 않는다.
+     */
+    fun retry() {
+        loadSido()
+        refreshRecent()
+    }
+
     fun loadSido() {
         _state.update { it.copy(sido = UiState.Loading) }
         viewModelScope.launch {
-            _state.update { it.copy(sido = runCatchingList { repository.sidoList() }) }
+            _state.update { it.copy(sido = fetchList { repository.sidoList() }) }
         }
     }
 
     private fun observeRecent() {
         viewModelScope.launch {
             recentStore.codes.collect { codes ->
-                // 최근 지역은 부가 기능이다. 실패해도 화면 전체를 실패로 만들지 않는다.
-                val regions = runCatching { repository.byCodes(codes) }.getOrDefault(emptyList())
-                _state.update { it.copy(recent = regions) }
+                recentCodes = codes
+                loadRecent(codes)
             }
         }
+    }
+
+    private fun refreshRecent() {
+        viewModelScope.launch { loadRecent(recentCodes) }
+    }
+
+    private suspend fun loadRecent(codes: List<String>) {
+        // 최근 지역은 부가 기능이다. 실패해도 화면 전체를 실패로 만들지 않는다.
+        // (網이 끊겨도 한 번 본 지역이면 사본에서 이름이 나온다 — RegionRepository.)
+        val fetched = runCatching { repository.byCodes(codes) }.getOrNull() ?: return
+        markSource(fetched.cachedAt)
+        _state.update { it.copy(recent = fetched.data) }
     }
 
     fun selectSido(region: Region) {
@@ -77,7 +109,7 @@ class RegionPickerViewModel(
             )
         }
         viewModelScope.launch {
-            _state.update { it.copy(sigungu = runCatchingList { repository.children(region.code) }) }
+            _state.update { it.copy(sigungu = fetchList { repository.children(region.code) }) }
         }
     }
 
@@ -86,7 +118,7 @@ class RegionPickerViewModel(
             it.copy(selectedSigungu = region, selectedDong = null, dong = UiState.Loading)
         }
         viewModelScope.launch {
-            _state.update { it.copy(dong = runCatchingList { repository.children(region.code) }) }
+            _state.update { it.copy(dong = fetchList { repository.children(region.code) }) }
         }
     }
 
@@ -104,7 +136,7 @@ class RegionPickerViewModel(
         searchJob = viewModelScope.launch {
             delay(SEARCH_DEBOUNCE_MS) // 글자마다 때리지 않는다
             _state.update { it.copy(searchResult = UiState.Loading) }
-            _state.update { it.copy(searchResult = runCatchingList { repository.searchDong(keyword) }) }
+            _state.update { it.copy(searchResult = fetchList { repository.searchDong(keyword) }) }
         }
     }
 
@@ -113,15 +145,16 @@ class RegionPickerViewModel(
         _state.update { it.copy(selectedDong = dong, searchKeyword = "", searchResult = null) }
         viewModelScope.launch {
             val sidoCode = dong.code.take(SIDO_CODE_LENGTH).padEnd(dong.code.length, '0')
-            val sido = runCatching { repository.byCodes(listOf(sidoCode)) }.getOrNull()?.firstOrNull()
-            val sigungu = dong.parentCode
-                ?.let { code -> runCatching { repository.byCodes(listOf(code)) }.getOrNull()?.firstOrNull() }
+            val sido = runCatching { repository.byCodes(listOf(sidoCode)) }.getOrNull()?.data?.firstOrNull()
+            val sigungu = dong.parentCode?.let { code ->
+                runCatching { repository.byCodes(listOf(code)) }.getOrNull()?.data?.firstOrNull()
+            }
             _state.update { it.copy(selectedSido = sido, selectedSigungu = sigungu) }
             if (sido != null) {
-                _state.update { it.copy(sigungu = runCatchingList { repository.children(sido.code) }) }
+                _state.update { it.copy(sigungu = fetchList { repository.children(sido.code) }) }
             }
             if (sigungu != null) {
-                _state.update { it.copy(dong = runCatchingList { repository.children(sigungu.code) }) }
+                _state.update { it.copy(dong = fetchList { repository.children(sigungu.code) }) }
             }
         }
     }
@@ -144,8 +177,23 @@ class RegionPickerViewModel(
         viewModelScope.launch { recentStore.remember(region.code) }
     }
 
-    private inline fun <T> runCatchingList(block: () -> List<T>): UiState<List<T>> =
-        runCatching(block).fold(onSuccess = { it.toUiState() }, onFailure = { UiState.Failed(it) })
+    /**
+     * 조회 하나를 화면 상태로 바꾸면서, 그 값이 사본에서 나왔는지를 함께 기록한다.
+     * 빈 목록은 성공이 아니라 [UiState.Empty] 다.
+     */
+    private suspend fun <T> fetchList(block: suspend () -> Fetched<List<T>>): UiState<List<T>> =
+        runCatching { block() }.fold(
+            onSuccess = { fetched ->
+                markSource(fetched.cachedAt)
+                fetched.data.toUiState()
+            },
+            onFailure = { UiState.Failed(it) },
+        )
+
+    /** 실패는 배너를 건드리지 않는다 — 실패 화면에는 이미 재시도 버튼이 있다. */
+    private fun markSource(cachedAt: Long?) {
+        _state.update { it.copy(cachedAt = cachedAt) }
+    }
 
     companion object {
         private const val SEARCH_DEBOUNCE_MS = 250L

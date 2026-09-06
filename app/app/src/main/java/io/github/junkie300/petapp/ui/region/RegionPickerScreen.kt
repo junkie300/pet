@@ -50,6 +50,7 @@ import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.Region
 import io.github.junkie300.petapp.ui.common.EmptyMessage
 import io.github.junkie300.petapp.ui.common.FailedMessage
+import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.theme.CardShape
@@ -82,6 +83,10 @@ fun RegionPickerScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap),
     ) {
         Header(selected = state.selectedDong)
+
+        // 사본으로 그린 목록이면 말해 준다. 오프라인 검색은 **이미 받아 둔 읍면동**만 찾으므로
+        // 결과가 적을 수 있는데, 배너가 없으면 "우리 동네가 없다"로 읽힌다 (spec.md §5.3).
+        state.cachedAt?.let { OfflineBanner(cachedAt = it) }
 
         SearchField(
             keyword = state.searchKeyword,
@@ -297,7 +302,7 @@ private fun StepCard(
                 selected = state.selectedSido,
                 enabled = true,
                 onSelect = viewModel::selectSido,
-                onRetry = viewModel::loadSido,
+                onRetry = viewModel::retry,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             RegionDropdown(

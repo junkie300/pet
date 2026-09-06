@@ -9,6 +9,7 @@ import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.RecentRegionStore
 import io.github.junkie300.petapp.data.Region
 import io.github.junkie300.petapp.data.RegionRepository
+import io.github.junkie300.petapp.data.oldestCachedAt
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.toUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +36,8 @@ sealed interface PlaceListUiState {
         val region: Region,
         /** 빈 목록은 성공이 아니라 [UiState.Empty] 다 — "이 동네엔 없습니다"로 적기 위해서다. */
         val places: UiState<List<Place>>,
+        /** null 이 아니면 받아 둔 사본으로 그린 화면이다. 그 시각이 오프라인 배너에 뜬다. */
+        val cachedAt: Long? = null,
     ) : PlaceListUiState
 }
 
@@ -73,16 +76,24 @@ class PlaceListViewModel(
             return
         }
         _state.value = PlaceListUiState.Loading
-        val region = runCatching { regions.byCodes(listOf(code)) }.getOrNull()?.firstOrNull()
+        val fetchedRegion = runCatching { regions.byCodes(listOf(code)) }.getOrNull()
+        val region = fetchedRegion?.data?.firstOrNull()
         if (region == null) {
             _state.value = PlaceListUiState.Failed(code)
             return
         }
         // 지역 이름을 먼저 띄운다. 목록을 기다리느라 머리말까지 비워 두지 않는다.
-        _state.value = PlaceListUiState.Ready(region, UiState.Loading)
-        val result = runCatching { places.listByRegion(region.code, category) }
-            .fold(onSuccess = { it.toUiState() }, onFailure = { UiState.Failed(it) })
-        _state.value = PlaceListUiState.Ready(region, result)
+        _state.value = PlaceListUiState.Ready(region, UiState.Loading, fetchedRegion.cachedAt)
+        _state.value = runCatching { places.listByRegion(region.code, category) }.fold(
+            onSuccess = { fetched ->
+                PlaceListUiState.Ready(
+                    region = region,
+                    places = fetched.data.toUiState(),
+                    cachedAt = oldestCachedAt(fetchedRegion.cachedAt, fetched.cachedAt),
+                )
+            },
+            onFailure = { PlaceListUiState.Ready(region, UiState.Failed(it), fetchedRegion.cachedAt) },
+        )
     }
 
     companion object {
