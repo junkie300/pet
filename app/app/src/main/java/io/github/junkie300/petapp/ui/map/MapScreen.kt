@@ -56,6 +56,7 @@ import com.kakao.vectormap.label.LabelTextBuilder
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.data.PlaceCategory
+import io.github.junkie300.petapp.data.Region
 import io.github.junkie300.petapp.ui.common.ComingSoonScreen
 import io.github.junkie300.petapp.ui.common.EmptyMessage
 import io.github.junkie300.petapp.ui.common.FailedMessage
@@ -109,11 +110,11 @@ fun MapScreen(
     }
 
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val categoryName = stringResource(viewModel.category.labelRes)
+    val selected by viewModel.selected.collectAsStateWithLifecycle()
     val ready = state as? PlaceListUiState.Ready
 
     val places = ((ready?.places as? UiState.Success)?.data).orEmpty()
-    val pins = remember(places, viewModel.category) { places.toPins(viewModel.category) }
+    val pins = remember(places, selected) { places.toPins(selected.first()) }
     val region = ready?.region
     val regionCenter = remember(region) {
         val lat = region?.centerLat
@@ -173,6 +174,8 @@ fun MapScreen(
                 .fillMaxWidth()
                 .onSizeChanged { noticeHeightPx = it.height },
         ) {
+            CategoryFilterChips(selected = selected, onToggle = viewModel::toggle)
+
             ready?.cachedAt?.let { OfflineBanner(cachedAt = it) }
             mapError?.let { error ->
                 MapNotice(text = stringResource(R.string.map_error, error), emphasis = true)
@@ -183,29 +186,7 @@ fun MapScreen(
             state = sheetState,
             containerHeightPx = containerHeightPx,
             listState = listState,
-            header = {
-                SheetHeader(
-                    title = when {
-                        state is PlaceListUiState.NoRegion -> stringResource(R.string.place_list_no_region)
-                        region == null -> stringResource(R.string.map_loading)
-                        // 좌표가 없는 장소는 핀이 될 수 없다. 조용히 빼면 목록의 건수와 어긋난다.
-                        pins.size != places.size -> stringResource(
-                            R.string.map_summary_missing_coords,
-                            region.fullName,
-                            categoryName,
-                            pins.size,
-                            places.size - pins.size,
-                        )
-
-                        else -> stringResource(
-                            R.string.map_summary,
-                            region.fullName,
-                            categoryName,
-                            places.size,
-                        )
-                    },
-                )
-            },
+            header = { SheetHeader(title = sheetTitle(state, region, selected, places.size, pins.size)) },
         ) {
             when {
                 state is PlaceListUiState.NoRegion -> Unit
@@ -219,8 +200,15 @@ fun MapScreen(
                 ready.places is UiState.Failed ->
                     item { FailedMessage(onRetry = viewModel::retry) }
 
-                ready.places is UiState.Empty ->
-                    item { EmptyMessage(text = stringResource(R.string.place_list_empty, categoryName)) }
+                ready.places is UiState.Empty -> item {
+                    // 칩이 하나면 그 이름으로, 여럿이면 뭉뚱그린다 — "이 지역에는 등록된
+                    // 동물병원·미용 정보가" 처럼 이어 붙이면 조사가 어긋난다.
+                    EmptyMessage(
+                        text = selected.singleOrNull()
+                            ?.let { stringResource(R.string.place_list_empty, stringResource(it.labelRes)) }
+                            ?: stringResource(R.string.map_empty_multi),
+                    )
+                }
 
                 else -> placeItems(
                     places = places,
@@ -229,6 +217,42 @@ fun MapScreen(
                 )
             }
         }
+    }
+}
+
+/**
+ * 시트 머리말 문구.
+ *
+ * 칩을 하나만 켰으면 그 이름을 적고(`삼성동 · 동물병원 8곳`), 여럿이면 이름을 빼고 건수만 적는다 —
+ * 칩 줄이 바로 위에 있으므로 무엇을 보고 있는지는 거기서 읽힌다.
+ *
+ * ⚠️ **좌표가 없어 핀이 못 된 장소는 반드시 밝힌다.** 조용히 빼면 시트의 건수와 지도의 핀 수가
+ * 어긋나고, 사용자는 어느 쪽이 맞는지 알 수 없다.
+ */
+@Composable
+private fun sheetTitle(
+    state: PlaceListUiState,
+    region: Region?,
+    selected: Set<PlaceCategory>,
+    placeCount: Int,
+    pinCount: Int,
+): String {
+    if (state is PlaceListUiState.NoRegion) return stringResource(R.string.place_list_no_region)
+    if (region == null) return stringResource(R.string.map_loading)
+
+    val missing = placeCount - pinCount
+    val single = selected.singleOrNull()?.let { stringResource(it.labelRes) }
+    return when {
+        single != null && missing > 0 ->
+            stringResource(R.string.map_summary_missing_coords, region.fullName, single, pinCount, missing)
+
+        single != null ->
+            stringResource(R.string.map_summary, region.fullName, single, placeCount)
+
+        missing > 0 ->
+            stringResource(R.string.map_summary_multi_missing_coords, region.fullName, pinCount, missing)
+
+        else -> stringResource(R.string.map_summary_multi, region.fullName, placeCount)
     }
 }
 

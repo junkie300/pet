@@ -61,41 +61,62 @@ class PlaceRepository(private val client: SupabaseClient, private val cache: Cac
     )
 
     /**
-     * 한 읍면동의 한 카테고리 목록 (S-02 목록).
+     * 한 읍면동에서 **고른 카테고리들**의 목록 (S-02 지도·목록).
+     *
+     * 카테고리가 여럿인 것은 지도의 필터 칩이 복수 선택이기 때문이다 (spec.md §5.2).
+     * 목록 화면은 하나만 넘긴다 — 같은 조회를 두 벌 만들지 않기 위해서다 (D-26·D-76).
      *
      * 이름 순으로 준다. 거리 순이 더 자연스럽지만 그건 현재 위치가 있어야 하고,
      * 이 앱의 기준점은 현재 위치가 아니라 **내가 고른 지역**이다 (D-24).
      */
     suspend fun listByRegion(
         regionCode: String,
-        category: PlaceCategory,
-        limit: Int = LIST_LIMIT,
-    ): Fetched<List<Place>> = fetchOrCached(
-        remote = {
-            query {
-                filter {
-                    eq("region_code", regionCode)
-                    eq("category", category.dbValue)
-                    eq("status", STATUS_OPEN)
+        categories: Set<PlaceCategory>,
+        limitPerCategory: Int = LIST_LIMIT,
+    ): Fetched<List<Place>> {
+        require(categories.isNotEmpty()) { "카테고리를 최소 하나는 골라야 한다." }
+        val dbValues = categories.map { it.dbValue }
+        return fetchOrCached(
+            remote = {
+                query {
+                    filter {
+                        eq("region_code", regionCode)
+                        isIn("category", dbValues)
+                        eq("status", STATUS_OPEN)
+                    }
+                    order("name", Order.ASCENDING)
+                    // 상한은 **고른 카테고리 수만큼** 늘린다. 하나였을 때의 상한을 그대로 두면
+                    // 칩을 여러 개 켠 순간 조용히 잘린다.
+                    limit(limitPerCategory.toLong() * categories.size)
                 }
-                order("name", Order.ASCENDING)
-                limit(limit.toLong())
-            }
-        },
-        store = { places ->
-            val now = System.currentTimeMillis()
-            cache.replacePlacesIn(
-                regionCode = regionCode,
-                category = category.dbValue,
-                places = places.map { CachedPlace.from(it, regionCode, now) },
-            )
-        },
-        cached = {
-            val rows = cache.placesIn(regionCode, category.dbValue)
-            // 빈 사본은 "없다"가 아니라 "모른다"다. 실패로 둔다.
-            if (rows.isEmpty()) null else Fetched(rows.map { it.toPlace() }, rows.minOf { it.cachedAt })
-        },
-    )
+            },
+            store = { places ->
+                val now = System.currentTimeMillis()
+                val byCategory = places.groupBy { it.category }
+                // ⚠️ 한 건도 안 온 카테고리도 **빈 목록으로 갈아 끼운다.** 안 그러면 그 카테고리의
+                // 옛 사본이 남아 오프라인에서만 되살아난다 (replacePlacesIn 주석과 같은 이유).
+                categories.forEach { category ->
+                    cache.replacePlacesIn(
+                        regionCode = regionCode,
+                        category = category.dbValue,
+                        places = byCategory[category.dbValue].orEmpty()
+                            .map { CachedPlace.from(it, regionCode, now) },
+                    )
+                }
+            },
+            cached = {
+                val rows = categories.map { cache.placesIn(regionCode, it.dbValue) }
+                // 고른 것 중 하나라도 사본이 없으면 **모르는 것**이다. 나머지만 보여 주면
+                // 사용자는 그게 전부인 줄 안다 (D-62 와 같은 규칙).
+                if (rows.any { it.isEmpty() }) {
+                    null
+                } else {
+                    val all = rows.flatten()
+                    Fetched(all.map { it.toPlace() }.sortedBy { it.name }, all.minOf { it.cachedAt })
+                }
+            },
+        )
+    }
 
     /** 장소 상세 (S-03). 사라진 id 일 수 있으므로 null 이 날 수 있다. */
     suspend fun byId(id: Long): Fetched<Place?> = fetchOrCached(

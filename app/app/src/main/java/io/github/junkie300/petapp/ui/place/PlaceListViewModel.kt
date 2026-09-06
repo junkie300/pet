@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * 한 읍면동의 한 카테고리 목록.
+ * 한 읍면동에서 **고른 카테고리들**의 목록.
  *
  * 홈과 같은 네 상태를 쓴다 — "아직 안 골랐다"(NoRegion)와 "못 불러왔다"(Failed)를
  * 절대 합치지 않는다 (spec.md §5.3).
@@ -41,8 +41,14 @@ sealed interface PlaceListUiState {
     ) : PlaceListUiState
 }
 
+/**
+ * 목록 화면과 지도가 **같이 쓰는** ViewModel (D-26·D-76).
+ *
+ * 다른 것은 고를 수 있는 카테고리 수뿐이다 — 목록 화면은 하나로 고정이고, 지도는 필터 칩으로
+ * 여럿을 켠다. 조회를 두 벌로 나누면 같은 동네를 두고 지도와 목록이 다른 답을 하게 된다.
+ */
 class PlaceListViewModel(
-    val category: PlaceCategory,
+    initialSelection: Set<PlaceCategory>,
     private val regions: RegionRepository,
     private val places: PlaceRepository,
     recentStore: RecentRegionStore,
@@ -51,9 +57,14 @@ class PlaceListViewModel(
     private val _state = MutableStateFlow<PlaceListUiState>(PlaceListUiState.Loading)
     val state: StateFlow<PlaceListUiState> = _state.asStateFlow()
 
+    /** 지금 켜져 있는 카테고리. 필터 칩이 이걸 그린다. **절대 비지 않는다.** */
+    private val _selected = MutableStateFlow(initialSelection)
+    val selected: StateFlow<Set<PlaceCategory>> = _selected.asStateFlow()
+
     private var currentCode: String? = null
 
     init {
+        require(initialSelection.isNotEmpty()) { "카테고리를 최소 하나는 골라야 한다." }
         viewModelScope.launch {
             // 현재 지역은 최근 목록의 맨 앞이다 (D-54). 홈과 같은 값을 본다.
             recentStore.codes
@@ -64,6 +75,26 @@ class PlaceListViewModel(
                     load(code)
                 }
         }
+    }
+
+    /**
+     * 칩 하나를 켜고 끈다.
+     *
+     * ⚠️ **마지막 하나는 끌 수 없다.** 다 꺼진 지도는 "이 동네엔 없다"와 구분되지 않는데,
+     * 사실은 아무것도 묻지 않은 상태다 (spec.md §5.3 이 가르라고 한 그 구분이다).
+     */
+    fun toggle(category: PlaceCategory) {
+        val current = _selected.value
+        val next = if (category in current) current - category else current + category
+        if (next.isEmpty()) return
+        select(next)
+    }
+
+    /** 홈 타일처럼 **바깥에서** 카테고리를 정해 들어올 때. */
+    fun select(categories: Set<PlaceCategory>) {
+        if (categories.isEmpty() || categories == _selected.value) return
+        _selected.value = categories
+        viewModelScope.launch { load(currentCode) }
     }
 
     fun retry() {
@@ -84,7 +115,8 @@ class PlaceListViewModel(
         }
         // 지역 이름을 먼저 띄운다. 목록을 기다리느라 머리말까지 비워 두지 않는다.
         _state.value = PlaceListUiState.Ready(region, UiState.Loading, fetchedRegion.cachedAt)
-        _state.value = runCatching { places.listByRegion(region.code, category) }.fold(
+        val categories = _selected.value
+        _state.value = runCatching { places.listByRegion(region.code, categories) }.fold(
             onSuccess = { fetched ->
                 PlaceListUiState.Ready(
                     region = region,
@@ -98,14 +130,14 @@ class PlaceListViewModel(
 
     companion object {
         fun factory(
-            category: PlaceCategory,
+            initialSelection: Set<PlaceCategory>,
             regions: RegionRepository,
             places: PlaceRepository,
             recentStore: RecentRegionStore,
         ) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                PlaceListViewModel(category, regions, places, recentStore) as T
+                PlaceListViewModel(initialSelection, regions, places, recentStore) as T
         }
     }
 }

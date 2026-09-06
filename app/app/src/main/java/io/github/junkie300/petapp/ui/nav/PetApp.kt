@@ -119,9 +119,11 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                 HomeScreen(
                     viewModel = viewModel,
                     onRegionClick = { navController.navigate(ROUTE_REGION) },
-                    // 지도가 아직 없으므로 목록으로 간다. 지도가 붙으면 여기만 S-02 로 바꾼다.
+                    // 카테고리 타일 → **그 카테고리로 필터된 지도** (spec.md §5.1).
+                    // ⚠️ 지도는 탭이다. navigate() 로 홈 위에 얹으면 홈 탭의 백스택에 딸려
+                    // 들어가 다음에 홈을 눌렀을 때 지도가 되살아난다 (D-55).
                     onCategoryClick = { category ->
-                        navController.navigate("places/${category.dbValue}")
+                        navController.switchTab("${PetTab.MAP.route}?$ARG_CATEGORY=${category.dbValue}")
                     },
                 )
             }
@@ -151,8 +153,9 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     LaunchedEffect(Unit) { navController.popBackStack() }
                 } else {
                     val viewModel: PlaceListViewModel = viewModel(
+                        key = category.dbValue,
                         factory = PlaceListViewModel.factory(
-                            category,
+                            setOf(category),
                             container.regionRepository,
                             container.placeRepository,
                             container.recentRegionStore,
@@ -160,6 +163,7 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     )
                     PlaceListScreen(
                         viewModel = viewModel,
+                        category = category,
                         onBack = { navController.popBackStack() },
                         onPlaceClick = { place -> navController.navigate("place/${place.id}") },
                     )
@@ -194,21 +198,21 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     },
                 ),
             ) { entry ->
-                // 카테고리 없이 들어오면 지금 적재된 것 중 첫 번째를 연다. 필터 칩이 붙기 전까지의 기본값이다.
-                val category = PlaceCategory.fromDbValue(entry.arguments?.getString(ARG_CATEGORY))
-                    ?: PlaceCategory.loadedEntries.firstOrNull()
-                    ?: PlaceCategory.HOSPITAL
-                // 지도와 목록은 같은 조회를 쓴다 (D-26). 카테고리가 바뀌면 다른 ViewModel 이어야 하므로
-                // key 를 준다 — 안 주면 처음 연 카테고리의 것이 그대로 되살아난다.
+                // 홈 타일에서 카테고리를 실어 보냈으면 그것만, 그냥 탭으로 들어왔으면 적재된 전부.
+                val fromHome = PlaceCategory.fromDbValue(entry.arguments?.getString(ARG_CATEGORY))
+                val loaded = PlaceCategory.loadedEntries.toSet().ifEmpty { setOf(PlaceCategory.HOSPITAL) }
+                // ⚠️ ViewModel 은 **하나뿐이다.** 카테고리별로 key 를 나누면 칩으로 켠 선택이
+                // 카테고리마다 따로 살아 있어, 칩을 끄고 켤 때마다 다른 목록이 되살아난다 (D-76).
                 val viewModel: PlaceListViewModel = viewModel(
-                    key = category.dbValue,
                     factory = PlaceListViewModel.factory(
-                        category,
+                        fromHome?.let { setOf(it) } ?: loaded,
                         container.regionRepository,
                         container.placeRepository,
                         container.recentRegionStore,
                     ),
                 )
+                // 이미 열려 있는 지도로 홈 타일이 다시 들어오면 그 카테고리로 바꿔 준다.
+                LaunchedEffect(fromHome) { fromHome?.let { viewModel.select(setOf(it)) } }
                 MapScreen(
                     viewModel = viewModel,
                     onPlaceClick = { placeId -> navController.navigate("place/$placeId") },

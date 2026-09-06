@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.Place
+import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.DetailScaffold
 import io.github.junkie300.petapp.ui.common.EmptyMessage
 import io.github.junkie300.petapp.ui.common.FailedMessage
@@ -41,12 +42,14 @@ import io.github.junkie300.petapp.ui.theme.tabularFigures
 @Composable
 fun PlaceListScreen(
     viewModel: PlaceListViewModel,
+    /** 이 화면은 카테고리 하나로 고정이다. 지도만 칩으로 여럿을 켠다 (D-76). */
+    category: PlaceCategory,
     onBack: () -> Unit,
     onPlaceClick: (Place) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val categoryName = stringResource(viewModel.category.labelRes)
+    val categoryName = stringResource(category.labelRes)
 
     DetailScaffold(
         title = categoryName,
