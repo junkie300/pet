@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -24,7 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -111,10 +114,14 @@ fun MapScreen(
     // 지도가 검게 뜨는 사고는 예외도 로그도 분명하지 않다 (D-69). 받은 메시지를 화면에 그대로 적는다.
     var mapError by remember { mutableStateOf<String?>(null) }
 
+    // 상단 알림이 지도를 가린다. 그만큼을 지도에 알려 줘야 핀이 알림 뒤로 들어가지 않는다.
+    var noticeHeightPx by remember { mutableIntStateOf(0) }
+
     Box(modifier.fillMaxSize()) {
         MapCanvas(
             center = regionCenter,
             pins = pins,
+            topInsetPx = noticeHeightPx,
             onPinClick = onPlaceClick,
             onMapError = { mapError = it.message ?: it.javaClass.simpleName },
             modifier = Modifier.fillMaxSize(),
@@ -125,7 +132,8 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(horizontal = Spacing.screenHorizontal, vertical = 12.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .onSizeChanged { noticeHeightPx = it.height },
         ) {
             ready?.cachedAt?.let { OfflineBanner(cachedAt = it) }
 
@@ -221,12 +229,16 @@ private fun List<Place>.toPins(fallbackCategory: PlaceCategory): List<MapPin> = 
 private fun MapCanvas(
     center: LatLng?,
     pins: List<MapPin>,
+    /** 상단 알림에 가려지는 높이(px). 카메라가 이만큼을 빼고 화면을 잡는다. */
+    topInsetPx: Int,
     onPinClick: (Long) -> Unit,
     onMapError: (Exception) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val density = LocalDensity.current
+    val fitPaddingPx = remember(density) { with(density) { FIT_PADDING.roundToPx() } }
 
     // 콜백은 지도를 시작할 때 한 번만 등록된다. 그 안에서 최신 람다·값을 보게 해 둔다.
     val currentPinClick by rememberUpdatedState(onPinClick)
@@ -283,9 +295,15 @@ private fun MapCanvas(
         }
     }
 
+    // 지도에게 "이만큼은 가려져 있다"고 알려 준다. 이걸 안 하면 fitMapPoints 가 잡아 준 위쪽
+    // 핀이 상단 알림 뒤로 들어간다 — 화면으로 보기 전에는 드러나지 않는 종류의 어긋남이다.
+    LaunchedEffect(kakaoMap, topInsetPx) {
+        kakaoMap?.setPadding(0, topInsetPx, 0, 0)
+    }
+
     // 핀은 지도가 준비된 뒤에만 그릴 수 있다. 목록이 바뀌면 통째로 다시 그린다 — 한 읍면동의
     // 한 카테고리는 수십 개라, 지우고 다시 찍는 편이 차이를 계산하는 것보다 싸고 안전하다.
-    LaunchedEffect(kakaoMap, pins) {
+    LaunchedEffect(kakaoMap, pins, fitPaddingPx) {
         val map = kakaoMap ?: return@LaunchedEffect
         val labels = map.labelManager ?: return@LaunchedEffect
         val layer = labels.layer ?: return@LaunchedEffect
@@ -323,7 +341,9 @@ private fun MapCanvas(
             if (points.size == 1) {
                 CameraUpdateFactory.newCenterPosition(points.first(), REGION_ZOOM)
             } else {
-                CameraUpdateFactory.fitMapPoints(points, FIT_PADDING_PX)
+                // 핀 옆에 이름이 붙으므로 여백을 넉넉히 준다. 그래도 아주 긴 이름은 걸린다 —
+                // 이름끼리 겹치는 것은 클러스터링(④)에서 함께 다룬다.
+                CameraUpdateFactory.fitMapPoints(points, fitPaddingPx)
             },
         )
     }
@@ -356,8 +376,12 @@ private val DEFAULT_CENTER = LatLng.from(36.3, 127.8)
 private const val NATIONWIDE_ZOOM = 7
 private const val REGION_ZOOM = 14
 
-/** fitMapPoints 의 여백(px). 핀 그림과 이름이 화면 가장자리에 걸리지 않을 만큼. */
-private const val FIT_PADDING_PX = 80
+/**
+ * fitMapPoints 의 여백. 핀 옆에 이름이 붙으므로 그림 크기보다 넉넉히 준다.
+ * ⚠️ 더 키우면 여백을 확보하려고 **축척이 통째로 물러난다** — 이름끼리 겹치는 것은
+ * 여백이 아니라 클러스터링(④)으로 푼다.
+ */
+private val FIT_PADDING = 40.dp
 
 private const val PIN_TEXT_SIZE = 26
 private const val PIN_TEXT_COLOR = 0xFF1A1A1A.toInt()
