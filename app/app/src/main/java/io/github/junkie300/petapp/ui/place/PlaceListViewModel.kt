@@ -3,7 +3,9 @@ package io.github.junkie300.petapp.ui.place
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.junkie300.petapp.data.DeviceLocation
 import io.github.junkie300.petapp.data.Fetched
+import io.github.junkie300.petapp.data.GeoPoint
 import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.data.PlaceRepository
@@ -57,6 +59,7 @@ class PlaceListViewModel(
     initialSelection: Set<PlaceCategory>,
     private val regions: RegionRepository,
     private val places: PlaceRepository,
+    private val deviceLocation: DeviceLocation,
     recentStore: RecentRegionStore,
 ) : ViewModel() {
 
@@ -67,6 +70,15 @@ class PlaceListViewModel(
     private val _selected = MutableStateFlow(initialSelection)
     val selected: StateFlow<Set<PlaceCategory>> = _selected.asStateFlow()
 
+    /**
+     * 거리를 재는 기준점. null 이면 카드에 거리가 안 붙는다 (D-81).
+     *
+     * ⚠️ **목록 순서는 이것과 무관하다.** 이 앱의 기준점은 현재 위치가 아니라 사용자가 고른
+     * 지역이고(D-24·D-59), 거리는 그 안에서 "어느 쪽이 가까운가"를 돕는 곁가지다.
+     */
+    private val _origin = MutableStateFlow<GeoPoint?>(null)
+    val origin: StateFlow<GeoPoint?> = _origin.asStateFlow()
+
     private var currentCode: String? = null
 
     /** 지금 흐르고 있는 조회. 지역·카테고리가 바뀌면 **먼저 끊는다.** */
@@ -74,6 +86,8 @@ class PlaceListViewModel(
 
     init {
         require(initialSelection.isNotEmpty()) { "카테고리를 최소 하나는 골라야 한다." }
+        // 이미 권한이 있으면 묻지 않고 바로 잡는다. 없으면 화면의 "거리 보기"가 물어본다.
+        if (deviceLocation.hasPermission) refreshLocation()
         viewModelScope.launch {
             // 현재 지역은 최근 목록의 맨 앞이다 (D-54). 홈과 같은 값을 본다.
             recentStore.codes
@@ -107,6 +121,14 @@ class PlaceListViewModel(
     }
 
     fun retry() = load(currentCode)
+
+    /**
+     * 현재 위치를 다시 잡는다. 권한을 방금 받았을 때와 화면에 다시 들어왔을 때 부른다.
+     * **못 얻어도 조용하다** — 거리는 없으면 없는 대로 그린다.
+     */
+    fun refreshLocation() {
+        viewModelScope.launch { _origin.value = deviceLocation.current() }
+    }
 
     /**
      * 지역 이름과 목록을 **각각** 흘려 받아 합친다 (D-79). 사본이 있으면 배너 없이 먼저 그리고,
@@ -158,11 +180,12 @@ class PlaceListViewModel(
             initialSelection: Set<PlaceCategory>,
             regions: RegionRepository,
             places: PlaceRepository,
+            deviceLocation: DeviceLocation,
             recentStore: RecentRegionStore,
         ) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                PlaceListViewModel(initialSelection, regions, places, recentStore) as T
+                PlaceListViewModel(initialSelection, regions, places, deviceLocation, recentStore) as T
         }
     }
 }

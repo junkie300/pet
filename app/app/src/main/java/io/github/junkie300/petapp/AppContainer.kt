@@ -1,6 +1,7 @@
 package io.github.junkie300.petapp
 
 import android.content.Context
+import io.github.junkie300.petapp.data.DeviceLocation
 import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.RecentRegionStore
 import io.github.junkie300.petapp.data.RegionRepository
@@ -27,4 +28,7 @@ class AppContainer(context: Context) {
     val regionRepository: RegionRepository by lazy { RegionRepository(SupabaseProvider.client, cacheDao) }
     val placeRepository: PlaceRepository by lazy { PlaceRepository(SupabaseProvider.client, cacheDao) }
     val recentRegionStore: RecentRegionStore = RecentRegionStore(context.applicationContext)
+
+    /** 거리 표기용 현재 위치. 권한이 없으면 조용히 null 을 준다 (D-81). */
+    val deviceLocation: DeviceLocation = DeviceLocation(context.applicationContext)
 }

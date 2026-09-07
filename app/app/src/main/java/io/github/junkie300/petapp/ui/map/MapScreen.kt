@@ -73,6 +73,7 @@ import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.labelRes
+import io.github.junkie300.petapp.ui.place.DistanceRow
 import io.github.junkie300.petapp.ui.place.PlaceListUiState
 import io.github.junkie300.petapp.ui.place.PlaceListViewModel
 import io.github.junkie300.petapp.ui.place.placeItems
@@ -120,6 +121,7 @@ fun MapScreen(
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
+    val origin by viewModel.origin.collectAsStateWithLifecycle()
     val ready = state as? PlaceListUiState.Ready
 
     val places = ((ready?.places as? UiState.Success)?.data).orEmpty()
@@ -219,11 +221,17 @@ fun MapScreen(
                     )
                 }
 
-                else -> placeItems(
-                    places = places,
-                    onPlaceClick = { place -> onPlaceClick(place.id) },
-                    selectedId = selectedPlaceId,
-                )
+                else -> {
+                    item {
+                        DistanceRow(origin = origin, onLocationGranted = viewModel::refreshLocation)
+                    }
+                    placeItems(
+                        places = places,
+                        onPlaceClick = { place -> onPlaceClick(place.id) },
+                        selectedId = selectedPlaceId,
+                        origin = origin,
+                    )
+                }
             }
         }
     }

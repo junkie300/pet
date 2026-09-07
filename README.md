@@ -41,6 +41,8 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
     ui/home/                  S-00 홈 허브 (지역 칩 · 카테고리 6칸 · 건수)
     ui/region/                S-01 지역 선택 화면
     ui/place/                 장소 목록(지도 없는 기기의 경로 — D-80) · S-03 상세 (D-57)
+    data/DeviceLocation.kt    현재 위치. **Play 서비스를 쓰지 않는다** — D-81
+    data/GeoPoint.kt          하버사인 거리 + 카드에 적는 법(10m 단위) — D-81
     ui/map/                   S-02 지도 — 핀 · 바텀시트 3단 · 필터 칩 (D-70·D-74~D-76)
     ui/map/MapClustering.kt   핀 묶기. **화면 픽셀 격자**로 묶는다. SDK 에 클러스터러가 없다 — D-78
     ui/favorite/              S-07 즐겨찾기 (오프라인에서도 뜬다 — D-60)
@@ -191,7 +193,7 @@ DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을
 
 ```
 cd D:\pet\app
-gradlew testDebugUnitTest     # 48개 통과해야 함 (기기·네트워크 불필요)
+gradlew testDebugUnitTest     # 54개 통과해야 함 (기기·네트워크 불필요)
 gradlew installDebug          # 에뮬레이터/기기에 설치
 ```
 
@@ -231,9 +233,11 @@ gradlew installDebug          # 에뮬레이터/기기에 설치
    에뮬레이터에서는 지도가 열리지 않는다 (D-71). 나머지 화면은 에뮬레이터로 그대로 확인된다.
    · 폰을 USB 로 연결하고(개발자 옵션 > USB 디버깅) `cd D:\pet\app && gradlew installDebug`
    · 지도만 **까맣게** 뜨면 코드가 아니라 콘솔의 패키지명·키 해시를 먼저 본다 (D-69)
-3. **거리 표기** — 위치 권한이 붙는 시점에 목록 카드에 더한다 (`spec.md §6.4`, D-59).
-   지도의 "현재 위치로" 버튼과 **같은 권한**을 쓰므로 S-02 와 함께 하는 것이 자연스럽다
-   · 캐시 우선(cache-first)은 끝났다 — 에뮬레이터 실측까지 (D-79)
+3. **거리 숫자를 실기기에서 본다** — 코드와 단위 테스트는 끝났다 (D-81).
+   · ⚠️ **에뮬레이터는 위치를 안 준다.** `adb emu geo fix` 를 계속 먹여도 last location 이
+     null 이고 `cmd location` 은 root 로도 MOCK_LOCATION 을 거부한다. 지도와 같은 제약이다
+   · 실기기에서 목록의 `거리 보기` → 허용 → 카드에 `320m` 가 붙는지, 값이 그럴듯한지 본다
+   · 이어서 지도의 **"현재 위치로" 버튼**(`spec.md §5.2`)을 붙인다 — 권한은 이미 같은 것이다
 4. **지도 시트 안의 목록을 실기기에서 본다** — 캐시 우선으로 바뀐 뒤 사본으로 먼저
    그려지는지다. 홈·목록·상세는 에뮬레이터로 확인했다 (D-79·D-80)
 5. **아이콘을 런처에서 눈으로 본다** — 에셋과 배선은 끝났다 (D-77). 남은 것은 확인뿐이다.

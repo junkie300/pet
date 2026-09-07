@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.junkie300.petapp.data.PlaceCategory
+import io.github.junkie300.petapp.data.formatDistance
 import io.github.junkie300.petapp.ui.common.CategoryBadge
 import io.github.junkie300.petapp.ui.theme.CardShape
 import io.github.junkie300.petapp.ui.theme.tabularFigures
@@ -28,7 +29,8 @@ import io.github.junkie300.petapp.ui.theme.Spacing
  * 목록과 즐겨찾기가 같은 카드를 쓴다. 한쪽은 서버에서, 한쪽은 로컬 DB 에서 오지만
  * **사용자에게는 같은 것**이므로 다르게 생기면 안 된다. 그래서 원시값을 받는다.
  *
- * 거리는 아직 없다. 현재 위치 권한이 붙는 시점에 더한다 (D-59).
+ * [distanceMeters] 는 **있으면 적고 없으면 뺀다.** 위치 권한을 안 줬거나 못 잡은 것이며,
+ * 그때 카드가 달라 보이면 안 된다 (D-81).
  */
 @Composable
 fun PlaceCard(
@@ -38,6 +40,8 @@ fun PlaceCard(
     tel: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 현재 위치에서의 **직선** 거리(m). null 이면 거리를 적지 않는다. */
+    distanceMeters: Double? = null,
 ) {
     Card(
         shape = CardShape,
@@ -59,13 +63,28 @@ fun PlaceCard(
                 overflow = TextOverflow.Ellipsis,
             )
             if (!address.isNullOrBlank()) {
-                Text(
-                    text = address,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = address,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    // 거리는 주소 뒤에 붙는다. 이름 옆에 두면 이름이 그만큼 짧게 잘린다.
+                    distanceMeters?.let { meters ->
+                        Text(
+                            text = formatDistance(meters),
+                            style = MaterialTheme.typography.bodyMedium.tabularFigures(),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,

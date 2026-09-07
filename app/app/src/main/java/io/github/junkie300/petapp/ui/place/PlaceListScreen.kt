@@ -13,11 +13,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.junkie300.petapp.R
+import io.github.junkie300.petapp.data.GeoPoint
 import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.ui.common.DetailScaffold
@@ -37,7 +39,7 @@ import io.github.junkie300.petapp.ui.theme.tabularFigures
  * **목록을 먼저 만든다.** 지도가 붙으면 이 목록이 바텀시트 안으로 들어간다 —
  * 카드와 조회는 그대로 산다.
  *
- * 거리는 아직 없다 (`spec.md §6.4` 의 카드 규격 중 하나). 현재 위치 권한이 붙는 시점에 넣는다.
+ * 카드의 거리는 위치를 얻었을 때만 붙는다 — 없으면 "거리 보기"가 대신 뜬다 (D-81).
  */
 @Composable
 fun PlaceListScreen(
@@ -49,6 +51,7 @@ fun PlaceListScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val origin by viewModel.origin.collectAsStateWithLifecycle()
     val categoryName = stringResource(category.labelRes)
 
     DetailScaffold(
@@ -84,6 +87,8 @@ fun PlaceListScreen(
                 cachedAt = (state as PlaceListUiState.Ready).cachedAt,
                 categoryName = categoryName,
                 contentPadding = insets,
+                origin = origin,
+                onLocationGranted = viewModel::refreshLocation,
                 onRetry = viewModel::retry,
                 onPlaceClick = onPlaceClick,
             )
@@ -98,6 +103,9 @@ private fun PlaceListBody(
     cachedAt: Long?,
     categoryName: String,
     contentPadding: PaddingValues,
+    /** 거리를 재는 기준점. null 이면 카드에 거리가 안 붙고 대신 "거리 보기"가 뜬다 (D-81). */
+    origin: GeoPoint?,
+    onLocationGranted: () -> Unit,
     onRetry: () -> Unit,
     onPlaceClick: (Place) -> Unit,
 ) {
@@ -140,15 +148,25 @@ private fun PlaceListBody(
                 item { OfflineBanner(cachedAt = moment, modifier = Modifier.padding(bottom = 8.dp)) }
             }
             item {
-                Text(
-                    text = stringResource(R.string.place_list_count, places.data.size),
-                    style = MaterialTheme.typography.bodyMedium.tabularFigures(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.place_list_count, places.data.size),
+                        style = MaterialTheme.typography.bodyMedium.tabularFigures(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    DistanceRow(
+                        origin = origin,
+                        onLocationGranted = onLocationGranted,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
             }
             // 지도 바텀시트와 **같은 항목 코드**를 쓴다 (D-26).
-            placeItems(places = places.data, onPlaceClick = onPlaceClick)
+            placeItems(places = places.data, onPlaceClick = onPlaceClick, origin = origin)
         }
     }
 }

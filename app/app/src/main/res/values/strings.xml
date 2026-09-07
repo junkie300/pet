@@ -52,6 +52,8 @@
     <string name="map_summary_multi">%1$s · %2$d곳</string>
     <string name="map_summary_multi_missing_coords">%1$s · %2$d곳 · 좌표 없는 %3$d곳은 지도에 없습니다</string>
     <!-- 아직 적재하지 않은 카테고리의 칩. 없는 것이 아니라 안 실은 것이다 (D-53) -->
+    <string name="distance_enable">거리 보기</string>
+    <string name="distance_denied">위치 권한이 필요합니다</string>
     <string name="map_chip_pending">%1$s · 준비 중</string>
     <string name="map_empty_multi">이 지역에는 고른 카테고리의 장소가 없습니다</string>
     <!-- 바텀시트 손잡이. 끌어서 3단(peek·half·full), 눌러도 다음 단으로 간다 -->

@@ -4,6 +4,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+      거리 표기(spec.md §6.4)에만 쓴다. 둘 다 적어 두는 것은 안드로이드 12+ 가
+      "대략만 허용"을 사용자에게 고르게 하기 때문이다 — 대략이면 대략인 대로 적는다.
+      ⚠️ 위치는 **없어도 되는 값**이다. 안 주면 거리만 빠지고 화면은 그대로다 (D-81).
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application
         android:name=".PetApplication"
         android:allowBackup="true"

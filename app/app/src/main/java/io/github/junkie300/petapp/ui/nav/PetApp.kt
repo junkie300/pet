@@ -165,6 +165,7 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                             setOf(category),
                             container.regionRepository,
                             container.placeRepository,
+                            container.deviceLocation,
                             container.recentRegionStore,
                         ),
                     )
@@ -215,6 +216,7 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                         fromHome?.let { setOf(it) } ?: loaded,
                         container.regionRepository,
                         container.placeRepository,
+                        container.deviceLocation,
                         container.recentRegionStore,
                     ),
                 )
