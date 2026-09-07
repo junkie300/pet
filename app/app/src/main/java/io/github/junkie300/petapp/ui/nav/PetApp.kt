@@ -39,6 +39,7 @@ import io.github.junkie300.petapp.ui.favorite.FavoritesScreen
 import io.github.junkie300.petapp.ui.favorite.FavoritesViewModel
 import io.github.junkie300.petapp.ui.home.HomeScreen
 import io.github.junkie300.petapp.ui.home.HomeViewModel
+import io.github.junkie300.petapp.ui.map.KakaoMapProvider
 import io.github.junkie300.petapp.ui.map.MapScreen
 import io.github.junkie300.petapp.ui.more.MoreScreen
 import io.github.junkie300.petapp.ui.place.PlaceDetailScreen
@@ -123,7 +124,13 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     // ⚠️ 지도는 탭이다. navigate() 로 홈 위에 얹으면 홈 탭의 백스택에 딸려
                     // 들어가 다음에 홈을 눌렀을 때 지도가 되살아난다 (D-55).
                     onCategoryClick = { category ->
-                        navController.switchTab("${PetTab.MAP.route}?$ARG_CATEGORY=${category.dbValue}")
+                        if (KakaoMapProvider.isUsable) {
+                            navController.switchTab("${PetTab.MAP.route}?$ARG_CATEGORY=${category.dbValue}")
+                        } else {
+                            // ⚠️ 지도를 못 여는 기기에서 지도로 보내면 **막다른 안내가 전부다** (D-71).
+                            // 그때는 목록 화면이 그 자리를 대신한다 — 조회도 카드도 같은 것을 쓴다 (D-80).
+                            navController.navigate("places/${category.dbValue}")
+                        }
                     },
                 )
             }
