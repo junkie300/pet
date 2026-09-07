@@ -3,6 +3,7 @@ package io.github.junkie300.petapp.ui.place
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.junkie300.petapp.data.Fetched
 import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.data.PlaceRepository
@@ -12,11 +13,16 @@ import io.github.junkie300.petapp.data.RegionRepository
 import io.github.junkie300.petapp.data.oldestCachedAt
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.toUiState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
 /**
@@ -63,6 +69,9 @@ class PlaceListViewModel(
 
     private var currentCode: String? = null
 
+    /** 지금 흐르고 있는 조회. 지역·카테고리가 바뀌면 **먼저 끊는다.** */
+    private var loadJob: Job? = null
+
     init {
         require(initialSelection.isNotEmpty()) { "카테고리를 최소 하나는 골라야 한다." }
         viewModelScope.launch {
@@ -94,39 +103,55 @@ class PlaceListViewModel(
     fun select(categories: Set<PlaceCategory>) {
         if (categories.isEmpty() || categories == _selected.value) return
         _selected.value = categories
-        viewModelScope.launch { load(currentCode) }
+        load(currentCode)
     }
 
-    fun retry() {
-        viewModelScope.launch { load(currentCode) }
-    }
+    fun retry() = load(currentCode)
 
-    private suspend fun load(code: String?) {
+    /**
+     * 지역 이름과 목록을 **각각** 흘려 받아 합친다 (D-79). 사본이 있으면 배너 없이 먼저 그리고,
+     * 서버 답이 오면 갈아 끼운다. 서버가 못 주면 그때 사본에 배너가 붙는다.
+     *
+     * ⚠️ 두 조회를 겹쳐 놓지 않는다 — 이유는 [HomeViewModel] 의 같은 자리에 적어 두었다.
+     */
+    private fun load(code: String?) {
+        loadJob?.cancel()
         if (code == null) {
             _state.value = PlaceListUiState.NoRegion
             return
         }
         _state.value = PlaceListUiState.Loading
-        val fetchedRegion = runCatching { regions.byCodes(listOf(code)) }.getOrNull()
-        val region = fetchedRegion?.data?.firstOrNull()
-        if (region == null) {
-            _state.value = PlaceListUiState.Failed(code)
-            return
-        }
-        // 지역 이름을 먼저 띄운다. 목록을 기다리느라 머리말까지 비워 두지 않는다.
-        _state.value = PlaceListUiState.Ready(region, UiState.Loading, fetchedRegion.cachedAt)
         val categories = _selected.value
-        _state.value = runCatching { places.listByRegion(region.code, categories) }.fold(
-            onSuccess = { fetched ->
-                PlaceListUiState.Ready(
-                    region = region,
-                    places = fetched.data.toUiState(),
-                    cachedAt = oldestCachedAt(fetchedRegion.cachedAt, fetched.cachedAt),
-                )
-            },
-            onFailure = { PlaceListUiState.Ready(region, UiState.Failed(it), fetchedRegion.cachedAt) },
-        )
+        loadJob = viewModelScope.launch {
+            combine(regionOf(code), placesOf(code, categories)) { region, places ->
+                if (region == null) {
+                    PlaceListUiState.Failed(code)
+                } else {
+                    PlaceListUiState.Ready(
+                        region = region.data,
+                        places = places.data,
+                        cachedAt = oldestCachedAt(region.offlineSince, places.offlineSince),
+                    )
+                }
+            }.collect { _state.value = it }
+        }
     }
+
+    /** 지역 이름. 사본도 서버도 못 주면 null 이며, 그때가 [PlaceListUiState.Failed] 다. */
+    private fun regionOf(code: String): Flow<Fetched<Region>?> =
+        regions.byCodes(listOf(code))
+            .map { fetched -> fetched.data.firstOrNull()?.let { region -> fetched.map { region } } }
+            .catch { emit(null) }
+
+    /**
+     * 장소 목록. **[UiState.Loading] 을 먼저 내보낸다** — 그래야 지역 이름이 사본에서 바로
+     * 나왔을 때 목록을 기다리느라 머리말까지 비워 두지 않는다.
+     */
+    private fun placesOf(code: String, categories: Set<PlaceCategory>): Flow<Fetched<UiState<List<Place>>>> =
+        places.listByRegion(code, categories)
+            .map { fetched -> fetched.map { it.toUiState() } }
+            .catch { emit(Fetched(UiState.Failed(it))) }
+            .onStart { emit(Fetched(UiState.Loading)) }
 
     companion object {
         fun factory(

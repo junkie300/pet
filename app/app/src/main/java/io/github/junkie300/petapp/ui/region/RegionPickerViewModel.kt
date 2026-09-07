@@ -14,6 +14,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -90,12 +92,21 @@ class RegionPickerViewModel(
         viewModelScope.launch { loadRecent(recentCodes) }
     }
 
+    /**
+     * 최근 지역 칩. **사본이 있으면 서버를 기다리지 않고 먼저 뜬다** (D-79).
+     *
+     * 부가 기능이므로 실패해도 화면 전체를 실패로 만들지 않는다.
+     * (網이 끊겨도 한 번 본 지역이면 사본에서 이름이 나온다 — RegionRepository.)
+     */
     private suspend fun loadRecent(codes: List<String>) {
-        // 최근 지역은 부가 기능이다. 실패해도 화면 전체를 실패로 만들지 않는다.
-        // (網이 끊겨도 한 번 본 지역이면 사본에서 이름이 나온다 — RegionRepository.)
-        val fetched = runCatching { repository.byCodes(codes) }.getOrNull() ?: return
-        markSource(fetched.cachedAt)
-        _state.update { it.copy(recent = fetched.data) }
+        repository.byCodes(codes)
+            .catch { }
+            .collect { fetched ->
+                // ⚠️ 서버 답을 기다리는 중인 사본은 배너를 건드리지 않는다. 다른 조회가
+                // 이미 띄워 둔 배너를 지워 버리면 안 된다.
+                if (!fetched.awaitingServer) markSource(fetched.offlineSince)
+                _state.update { it.copy(recent = fetched.data) }
+            }
     }
 
     fun selectSido(region: Region) {
@@ -145,9 +156,11 @@ class RegionPickerViewModel(
         _state.update { it.copy(selectedDong = dong, searchKeyword = "", searchResult = null) }
         viewModelScope.launch {
             val sidoCode = dong.code.take(SIDO_CODE_LENGTH).padEnd(dong.code.length, '0')
-            val sido = runCatching { repository.byCodes(listOf(sidoCode)) }.getOrNull()?.data?.firstOrNull()
+            // 여기서는 값 하나만 있으면 된다 — 사용자가 고른 뒤 드롭다운을 되짚어 채우는 자리다.
+            val sido = runCatching { repository.byCodes(listOf(sidoCode)).last() }
+                .getOrNull()?.data?.firstOrNull()
             val sigungu = dong.parentCode?.let { code ->
-                runCatching { repository.byCodes(listOf(code)) }.getOrNull()?.data?.firstOrNull()
+                runCatching { repository.byCodes(listOf(code)).last() }.getOrNull()?.data?.firstOrNull()
             }
             _state.update { it.copy(selectedSido = sido, selectedSigungu = sigungu) }
             if (sido != null) {
@@ -184,7 +197,7 @@ class RegionPickerViewModel(
     private suspend fun <T> fetchList(block: suspend () -> Fetched<List<T>>): UiState<List<T>> =
         runCatching { block() }.fold(
             onSuccess = { fetched ->
-                markSource(fetched.cachedAt)
+                markSource(fetched.offlineSince)
                 fetched.data.toUiState()
             },
             onFailure = { UiState.Failed(it) },

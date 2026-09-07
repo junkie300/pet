@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 /**
@@ -19,8 +20,9 @@ import kotlinx.coroutines.withContext
  *
  * 카테고리별로 화면을 나누지 않는다 — 한 테이블·한 화면 코드가 이 프로젝트의 재사용 전략이다 (D-26).
  *
- * 세 조회 모두 **성공하면 사본을 남기고 실패하면 사본을 꺼낸다** ([fetchOrCached]).
- * 그래서 반환값이 [Fetched] 다 — 화면이 오프라인 배너를 띄우려면 값이 어디서 왔는지 알아야 한다.
+ * 세 조회 모두 **사본을 먼저 흘리고 서버 답으로 갈아 끼운다** ([cachedThenFresh]). 그래서
+ * 반환값이 `Flow<Fetched<..>>` 다 — 값 하나가 아니라 두 번 온다. 화면이 오프라인 배너를 띄우려면
+ * 값이 어디서 왔는지 알아야 하므로 값에는 출처가 붙어 있다 (D-79).
  */
 class PlaceRepository(private val client: SupabaseClient, private val cache: CacheDao) {
 
@@ -33,7 +35,7 @@ class PlaceRepository(private val client: SupabaseClient, private val cache: Cac
      *
      * 적재 안 된 카테고리는 아예 묻지 않는다 — [PlaceCategory.loaded] 참고.
      */
-    suspend fun countsByCategory(regionCode: String): Fetched<Map<PlaceCategory, Int>> = fetchOrCached(
+    fun countsByCategory(regionCode: String): Flow<Fetched<Map<PlaceCategory, Int>>> = cachedThenFresh(
         remote = {
             coroutineScope {
                 PlaceCategory.loadedEntries
@@ -69,14 +71,14 @@ class PlaceRepository(private val client: SupabaseClient, private val cache: Cac
      * 이름 순으로 준다. 거리 순이 더 자연스럽지만 그건 현재 위치가 있어야 하고,
      * 이 앱의 기준점은 현재 위치가 아니라 **내가 고른 지역**이다 (D-24).
      */
-    suspend fun listByRegion(
+    fun listByRegion(
         regionCode: String,
         categories: Set<PlaceCategory>,
         limitPerCategory: Int = LIST_LIMIT,
-    ): Fetched<List<Place>> {
+    ): Flow<Fetched<List<Place>>> {
         require(categories.isNotEmpty()) { "카테고리를 최소 하나는 골라야 한다." }
         val dbValues = categories.map { it.dbValue }
-        return fetchOrCached(
+        return cachedThenFresh(
             remote = {
                 query {
                     filter {
@@ -119,7 +121,7 @@ class PlaceRepository(private val client: SupabaseClient, private val cache: Cac
     }
 
     /** 장소 상세 (S-03). 사라진 id 일 수 있으므로 null 이 날 수 있다. */
-    suspend fun byId(id: Long): Fetched<Place?> = fetchOrCached(
+    fun byId(id: Long): Flow<Fetched<Place?>> = cachedThenFresh(
         remote = { query { filter { eq("id", id) } }.firstOrNull() },
         store = { place ->
             if (place == null) {

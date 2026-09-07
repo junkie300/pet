@@ -7,6 +7,9 @@ import io.github.jan.supabase.postgrest.query.Order
 import io.github.junkie300.petapp.data.cache.CacheDao
 import io.github.junkie300.petapp.data.cache.CachedRegion
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
@@ -54,15 +57,24 @@ class RegionRepository(private val client: SupabaseClient, private val cache: Ca
         )
     }
 
-    /** 최근 선택 지역을 코드로 되살릴 때 쓴다. 저장해 둔 코드가 사라졌을 수도 있으므로 결과가 빌 수 있다. */
-    suspend fun byCodes(codes: List<String>): Fetched<List<Region>> {
-        if (codes.isEmpty()) return Fetched(emptyList())
-        return fetchRegions(
+    /**
+     * 최근 선택 지역을 코드로 되살릴 때 쓴다. 저장해 둔 코드가 사라졌을 수도 있으므로 결과가 빌 수 있다.
+     *
+     * **이 조회만 흐름이다** (D-79). 홈·목록·지도가 화면을 열자마자 부르는 자리라, 사본이 있으면
+     * 서버를 기다리지 않고 지역 이름부터 그린다. 나머지 조회(드롭다운·검색)는 사용자가 그 자리에서
+     * 결과를 기다리는 것이라 최신을 봐야 한다.
+     */
+    fun byCodes(codes: List<String>): Flow<Fetched<List<Region>>> {
+        if (codes.isEmpty()) return flowOf(Fetched(emptyList()))
+        return cachedThenFresh(
             remote = { query { filter { isIn("code", codes) } } },
-            cached = { cache.regionsByCodes(codes) },
-        ).map { found ->
-            // 저장된 순서(최근 순)를 유지한다. PostgREST 는 order 를 full_name 으로 주기 때문이다.
-            codes.mapNotNull { code -> found.firstOrNull { it.code == code } }
+            store = ::storeRegions,
+            cached = { cachedRegions { cache.regionsByCodes(codes) } },
+        ).map { fetched ->
+            fetched.map { found ->
+                // 저장된 순서(최근 순)를 유지한다. PostgREST 는 order 를 full_name 으로 주기 때문이다.
+                codes.mapNotNull { code -> found.firstOrNull { it.code == code } }
+            }
         }
     }
 
@@ -71,16 +83,24 @@ class RegionRepository(private val client: SupabaseClient, private val cache: Ca
         cached: suspend () -> List<CachedRegion>,
     ): Fetched<List<Region>> = fetchOrCached(
         remote = remote,
-        store = { regions ->
-            val now = System.currentTimeMillis()
-            cache.putRegions(regions.map { CachedRegion.from(it, now) })
-        },
-        cached = {
-            val rows = cached()
-            // 빈 사본은 "그런 지역이 없다"가 아니라 "모른다"다 (fetchOrCached 주석 참고).
-            if (rows.isEmpty()) null else Fetched(rows.map { it.toRegion() }, rows.minOf { it.cachedAt })
-        },
+        store = ::storeRegions,
+        cached = { cachedRegions(cached) },
     )
+
+    private suspend fun storeRegions(regions: List<Region>) {
+        val now = System.currentTimeMillis()
+        cache.putRegions(regions.map { CachedRegion.from(it, now) })
+    }
+
+    private suspend fun cachedRegions(rows: suspend () -> List<CachedRegion>): Fetched<List<Region>>? {
+        val cached = rows()
+        // 빈 사본은 "그런 지역이 없다"가 아니라 "모른다"다 (cachedThenFresh 주석 참고).
+        return if (cached.isEmpty()) {
+            null
+        } else {
+            Fetched(cached.map { it.toRegion() }, cached.minOf { it.cachedAt })
+        }
+    }
 
     private suspend fun query(
         build: io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder.() -> Unit,

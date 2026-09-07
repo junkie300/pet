@@ -8,10 +8,13 @@ import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.favorite.FavoriteDao
 import io.github.junkie300.petapp.data.favorite.FavoritePlace
 import io.github.junkie300.petapp.ui.common.UiState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,6 +41,9 @@ class PlaceDetailViewModel(
     private val _state = MutableStateFlow<UiState<PlaceDetail>>(UiState.Loading)
     val state: StateFlow<UiState<PlaceDetail>> = _state.asStateFlow()
 
+    /** 지금 흐르고 있는 조회. 다시 시도하면 **먼저 끊는다.** */
+    private var loadJob: Job? = null
+
     /** DB 를 그대로 흘려 본다. 다른 화면에서 지워도 여기 별이 따라 꺼진다. */
     val isFavorite: StateFlow<Boolean> = favorites.observeIsFavorite(placeId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MS), false)
@@ -59,17 +65,23 @@ class PlaceDetailViewModel(
         }
     }
 
+    /**
+     * 사본이 있으면 **배너 없이 먼저 그리고** 서버 답으로 갈아 끼운다 (D-79).
+     * 서버가 못 주면 그때 사본에 배너가 붙는다.
+     */
     fun load() {
+        loadJob?.cancel()
         _state.value = UiState.Loading
-        viewModelScope.launch {
-            _state.value = runCatching { places.byId(placeId) }.fold(
-                onSuccess = { fetched ->
+        loadJob = viewModelScope.launch {
+            places.byId(placeId)
+                .map { fetched ->
                     val place = fetched.data
-                    if (place == null) UiState.Empty else UiState.Success(PlaceDetail(place, fetched.cachedAt))
-                },
+                    // 서버가 "그런 장소 없다"고 답한 것이다. 실패와 같은 화면으로 만들지 않는다.
+                    if (place == null) UiState.Empty else UiState.Success(PlaceDetail(place, fetched.offlineSince))
+                }
                 // 서버도 캐시도 못 줬다. 담아 둔 곳이면 그 스냅샷이 마지막 수단이다.
-                onFailure = { failure -> fromFavorite() ?: UiState.Failed(failure) },
-            )
+                .catch { failure -> emit(fromFavorite() ?: UiState.Failed(failure)) }
+                .collect { _state.value = it }
         }
     }
 

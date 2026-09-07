@@ -3,6 +3,7 @@ package io.github.junkie300.petapp.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.junkie300.petapp.data.Fetched
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.data.PlaceRepository
 import io.github.junkie300.petapp.data.RecentRegionStore
@@ -10,11 +11,16 @@ import io.github.junkie300.petapp.data.Region
 import io.github.junkie300.petapp.data.RegionRepository
 import io.github.junkie300.petapp.data.oldestCachedAt
 import io.github.junkie300.petapp.ui.common.UiState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
 /**
@@ -61,6 +67,9 @@ class HomeViewModel(
 
     private var currentCode: String? = null
 
+    /** 지금 흐르고 있는 조회. 지역이 바뀌거나 다시 시도하면 **먼저 끊는다.** */
+    private var loadJob: Job? = null
+
     init {
         viewModelScope.launch {
             // 현재 지역 = 최근 목록의 맨 앞. 현재 지역용 키를 따로 두면 두 값이 어긋날 수 있고,
@@ -75,37 +84,53 @@ class HomeViewModel(
         }
     }
 
-    fun retry() {
-        viewModelScope.launch { load(currentCode) }
-    }
+    fun retry() = load(currentCode)
 
-    private suspend fun load(code: String?) {
+    /**
+     * 지역 이름과 건수를 **각각** 흘려 받아 합친다 (D-79).
+     *
+     * ⚠️ 두 조회를 겹쳐 놓지 않는다(`flatMapLatest`). 지역이 사본→서버로 두 번 오는데 그때마다
+     * 건수 조회를 다시 걸면, 圈外에서 8초짜리 타임아웃을 두 번 쓴다. 건수에 필요한 것은
+     * 지역 **이름**이 아니라 코드이고, 코드는 처음부터 알고 있다.
+     */
+    private fun load(code: String?) {
+        loadJob?.cancel()
         if (code == null) {
             _state.value = HomeUiState.NoRegion
             return
         }
         _state.value = HomeUiState.Loading
-        // 網이 끊겨도 한 번 본 지역이면 사본으로 이름이 나온다 (RegionRepository).
-        val fetchedRegion = runCatching { regions.byCodes(listOf(code)) }.getOrNull()
-        val region = fetchedRegion?.data?.firstOrNull()
-        if (region == null) {
-            _state.value = HomeUiState.Failed(code)
-            return
+        loadJob = viewModelScope.launch {
+            combine(regionOf(code), countsOf(code)) { region, counts ->
+                if (region == null) {
+                    HomeUiState.Failed(code)
+                } else {
+                    HomeUiState.Ready(
+                        region = region.data,
+                        counts = counts.data,
+                        // 지역과 건수 중 **더 오래된 쪽**이 이 화면의 기준이다.
+                        cachedAt = oldestCachedAt(region.offlineSince, counts.offlineSince),
+                    )
+                }
+            }.collect { _state.value = it }
         }
-        // 지역 이름을 먼저 띄운다. 건수를 기다리느라 지역 칩까지 비워 두지 않는다.
-        _state.value = HomeUiState.Ready(region, UiState.Loading, fetchedRegion.cachedAt)
-        _state.value = runCatching { places.countsByCategory(region.code) }.fold(
-            onSuccess = { counts ->
-                // 지역과 건수 중 **더 오래된 쪽**이 이 화면의 기준이다. 둘 다 지금 것이면 null 이다.
-                HomeUiState.Ready(
-                    region = region,
-                    counts = UiState.Success(counts.data),
-                    cachedAt = oldestCachedAt(fetchedRegion.cachedAt, counts.cachedAt),
-                )
-            },
-            onFailure = { HomeUiState.Ready(region, UiState.Failed(it), fetchedRegion.cachedAt) },
-        )
     }
+
+    /** 지역 이름. 사본도 서버도 못 주면 null 이며, 그때가 [HomeUiState.Failed] 다. */
+    private fun regionOf(code: String): Flow<Fetched<Region>?> =
+        regions.byCodes(listOf(code))
+            .map { fetched -> fetched.data.firstOrNull()?.let { region -> fetched.map { region } } }
+            .catch { emit(null) }
+
+    /**
+     * 카테고리별 건수. **[UiState.Loading] 을 먼저 내보낸다** — 그래야 지역 이름이 사본에서
+     * 바로 나왔을 때 건수를 기다리느라 지역 칩까지 비워 두지 않는다.
+     */
+    private fun countsOf(code: String): Flow<Fetched<UiState<Map<PlaceCategory, Int>>>> =
+        places.countsByCategory(code)
+            .map { fetched -> fetched.map<UiState<Map<PlaceCategory, Int>>> { UiState.Success(it) } }
+            .catch { emit(Fetched(UiState.Failed(it))) }
+            .onStart { emit(Fetched(UiState.Loading)) }
 
     companion object {
         fun factory(

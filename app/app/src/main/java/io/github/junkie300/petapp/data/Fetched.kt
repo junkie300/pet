@@ -8,12 +8,30 @@ package io.github.junkie300.petapp.data
  * 저장소가 값만 돌려주면 그 구분이 사라진다. 그래서 값에 출처를 붙여서 돌려준다.
  *
  * [cachedAt] 이 null 이면 방금 서버에서 받은 값이고, 아니면 그 시각에 받아 둔 값이다.
+ *
+ * @param awaitingServer 사본을 **먼저 그리는 중**이고 서버 답을 아직 기다린다 (D-79).
+ *   값은 사본이지만 낡았다고 단정할 수 없다 — 그래서 [offlineSince] 가 null 이고 배너도 안 뜬다.
  */
-data class Fetched<out T>(val data: T, val cachedAt: Long? = null) {
+data class Fetched<out T>(
+    val data: T,
+    val cachedAt: Long? = null,
+    val awaitingServer: Boolean = false,
+) {
 
     val fromCache: Boolean get() = cachedAt != null
 
-    fun <R> map(transform: (T) -> R): Fetched<R> = Fetched(transform(data), cachedAt)
+    /**
+     * 오프라인 배너에 적을 시각. **기다리는 중에는 null 이다.**
+     *
+     * 網이 멀쩡한데 "오프라인"이 잠깐 떴다 사라지는 것은, 조금 늦게 뜨는 것보다 나쁘다 (D-66).
+     * 배너는 서버가 못 준다는 것이 **밝혀진 뒤에만** 뜬다.
+     */
+    val offlineSince: Long? get() = if (awaitingServer) null else cachedAt
+
+    fun <R> map(transform: (T) -> R): Fetched<R> = Fetched(transform(data), cachedAt, awaitingServer)
+
+    /** 이 사본을 화면에 먼저 내보낸다. 서버 답은 아직 오지 않았다. */
+    internal fun stillAsking(): Fetched<T> = copy(awaitingServer = true)
 }
 
 /** 화면 하나가 여러 조회를 합쳐 그릴 때, **가장 오래된 캐시 시각**이 그 화면의 기준이다. */
