@@ -2,6 +2,9 @@ package io.github.junkie300.petapp.ui.map
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +51,13 @@ import com.kakao.vectormap.KakaoMapReadyCallback
 import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.MapLifeCycleCallback
 import com.kakao.vectormap.MapView
+import com.kakao.vectormap.camera.CameraUpdate
 import com.kakao.vectormap.camera.CameraUpdateFactory
+import com.kakao.vectormap.label.CompetitionType
+import com.kakao.vectormap.label.CompetitionUnit
+import com.kakao.vectormap.label.LabelLayer
+import com.kakao.vectormap.label.LabelLayerOptions
+import com.kakao.vectormap.label.LabelManager
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
@@ -70,6 +79,7 @@ import io.github.junkie300.petapp.ui.place.placeItems
 import io.github.junkie300.petapp.ui.theme.CategoryColor
 import io.github.junkie300.petapp.ui.theme.PillShape
 import io.github.junkie300.petapp.ui.theme.Spacing
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -78,8 +88,7 @@ import kotlin.math.roundToInt
  * **목록과 같은 [PlaceListViewModel] 을 쓴다.** 지도와 목록은 같은 질문("이 동네의 이 카테고리")에
  * 대한 두 가지 그림일 뿐이라 조회를 두 벌 만들 이유가 없다 (D-26).
  *
- * 아직 첫 단계다 — 바텀시트 3단·카테고리 필터 칩·클러스터링은 다음 차례다. 지금은 **핀이 제자리에
- * 뜨는지 눈으로 확인하는 것**이 목적이다 (D-70).
+ * 핀이 [MapClustering.THRESHOLD] 개를 넘으면 화면 격자로 묶어 개수를 적은 원으로 그린다 (D-78).
  */
 @Composable
 fun MapScreen(
@@ -338,8 +347,17 @@ private fun MapCanvas(
     val currentPinClick by rememberUpdatedState(onPinClick)
     val currentMapError by rememberUpdatedState(onMapError)
     val currentCenter by rememberUpdatedState(center)
+    val currentFitPadding by rememberUpdatedState(fitPaddingPx)
 
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
+
+    // 지금 배율. 묶는 기준이 화면 픽셀이라 배율이 바뀌면 다시 묶어야 한다.
+    // ⚠️ 카메라가 움직일 때마다 다시 그리는 것이 아니다 — 배율이 그대로면 remember 가 이전
+    // 묶음을 그대로 돌려주므로, 지도를 밀기만 할 때는 핀을 건드리지 않는다.
+    var zoomLevel by remember { mutableIntStateOf(REGION_ZOOM) }
+
+    val cellPx = remember(density) { with(density) { MapClustering.CELL_DP.dp.roundToPx() } }
+    val clusters = remember(pins, zoomLevel, cellPx) { MapClustering.cluster(pins, zoomLevel, cellPx) }
 
     val mapView = remember {
         MapView(context).apply {
@@ -352,15 +370,26 @@ private fun MapCanvas(
                 },
                 object : KakaoMapReadyCallback() {
                     override fun onMapReady(map: KakaoMap) {
-                        map.setOnLabelClickListener { _, _, label ->
-                            val placeId = label.tag as? Long
-                            if (placeId == null) {
-                                false
-                            } else {
-                                currentPinClick(placeId)
-                                true
+                        map.setOnLabelClickListener { clicked, _, label ->
+                            when (val tag = label.tag) {
+                                // 핀 하나 — 시트에서 그 카드를 강조한다 (D-74).
+                                is Long -> {
+                                    currentPinClick(tag)
+                                    true
+                                }
+
+                                // 묶음 — 펼친다. 시트로도 상세로도 가지 않는다. 사용자가 물은 것은
+                                // "여기 뭐가 있나"이지 "그중 하나를 보여 달라"가 아니다.
+                                is MapCluster -> {
+                                    clicked.moveCamera(tag.expandCamera(clicked, currentFitPadding))
+                                    true
+                                }
+
+                                else -> false
                             }
                         }
+                        map.setOnCameraMoveEndListener { _, position, _ -> zoomLevel = position.zoomLevel }
+                        zoomLevel = map.zoomLevel
                         kakaoMap = map
                     }
 
@@ -395,51 +424,85 @@ private fun MapCanvas(
         kakaoMap?.setPadding(0, topInsetPx, 0, bottomInsetPx)
     }
 
-    // 핀은 지도가 준비된 뒤에만 그릴 수 있다. 목록이 바뀌면 통째로 다시 그린다 — 한 읍면동의
-    // 한 카테고리는 수십 개라, 지우고 다시 찍는 편이 차이를 계산하는 것보다 싸고 안전하다.
-    LaunchedEffect(kakaoMap, pins, fitPaddingPx) {
+    // 카메라는 **목록이 바뀔 때만** 잡는다. 여기에 배율을 끼워 넣으면 다시 묶기 → 카메라 이동 →
+    // 배율 변화 → 다시 묶기로 되돌아 도는 고리가 된다.
+    LaunchedEffect(kakaoMap, pins) {
         val map = kakaoMap ?: return@LaunchedEffect
-        val labels = map.labelManager ?: return@LaunchedEffect
-        val layer = labels.layer ?: return@LaunchedEffect
-        layer.removeAll()
-
         if (pins.isEmpty()) {
             center?.let { map.moveCamera(CameraUpdateFactory.newCenterPosition(it, REGION_ZOOM)) }
             return@LaunchedEffect
         }
-
-        // 스타일은 카테고리마다 하나면 된다. 핀 개수만큼 만들면 같은 그림을 수십 벌 올리게 된다.
-        val styles = pins.map { it.category }.distinct().associateWith { category ->
-            labels.addLabelStyles(
-                LabelStyles.from(
-                    LabelStyle.from(pinBitmap(context, category))
-                        .setTextStyles(PIN_TEXT_SIZE, PIN_TEXT_COLOR, PIN_TEXT_STROKE, PIN_TEXT_STROKE_COLOR),
-                ),
-            )
-        }
-
-        layer.addLabels(
-            pins.map { pin ->
-                LabelOptions.from(LatLng.from(pin.latitude, pin.longitude))
-                    .setStyles(styles[pin.category])
-                    .setTexts(LabelTextBuilder().setTexts(pin.name))
-                    .setClickable(true)
-                    // 핀을 눌렀을 때 어느 장소인지 되찾는 유일한 끈이다.
-                    .setTag(pin.placeId)
-            },
-        )
-
         // 한 점만 있으면 fitMapPoints 가 최대 배율까지 당겨 버린다. 그때는 그 점을 중심으로만 잡는다.
         val points = pins.map { LatLng.from(it.latitude, it.longitude) }.toTypedArray()
         map.moveCamera(
             if (points.size == 1) {
                 CameraUpdateFactory.newCenterPosition(points.first(), REGION_ZOOM)
             } else {
-                // 핀 옆에 이름이 붙으므로 여백을 넉넉히 준다. 그래도 아주 긴 이름은 걸린다 —
-                // 이름끼리 겹치는 것은 클러스터링(④)에서 함께 다룬다.
                 CameraUpdateFactory.fitMapPoints(points, fitPaddingPx)
             },
         )
+    }
+
+    // 핀은 지도가 준비된 뒤에만 그릴 수 있다. 묶음이 바뀌면 통째로 다시 그린다 — 한 읍면동은
+    // 수십~수백 개라, 지우고 다시 찍는 편이 차이를 계산하는 것보다 싸고 안전하다.
+    LaunchedEffect(kakaoMap, clusters) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        val labels = map.labelManager ?: return@LaunchedEffect
+        val pinLayer = labels.layerFor(PIN_LAYER_ID, CompetitionType.None, clickable = true)
+            ?: return@LaunchedEffect
+        val nameLayer = labels.layerFor(NAME_LAYER_ID, CompetitionType.All, clickable = false)
+            ?: return@LaunchedEffect
+        pinLayer.removeAll()
+        nameLayer.removeAll()
+        if (clusters.isEmpty()) return@LaunchedEffect
+
+        // 스타일은 그림 한 장마다 하나면 된다. 핀 개수만큼 만들면 같은 그림을 수십 벌 올리게 된다.
+        val pinStyles = mutableMapOf<PlaceCategory, LabelStyles?>()
+        val clusterStyles = mutableMapOf<Pair<PlaceCategory, Int>, LabelStyles?>()
+        val nameStyles = labels.addLabelStyles(
+            LabelStyles.from(
+                LabelStyle.from(spacerBitmap(context))
+                    .setTextStyles(PIN_TEXT_SIZE, PIN_TEXT_COLOR, PIN_TEXT_STROKE, PIN_TEXT_STROKE_COLOR),
+            ),
+        )
+
+        val pinOptions = mutableListOf<LabelOptions>()
+        val nameOptions = mutableListOf<LabelOptions>()
+        for (cluster in clusters) {
+            val position = LatLng.from(cluster.latitude, cluster.longitude)
+            val single = cluster.single
+            if (single == null) {
+                val category = cluster.dominantCategory
+                val styles = clusterStyles.getOrPut(category to cluster.size) {
+                    labels.addLabelStyles(
+                        LabelStyles.from(
+                            LabelStyle.from(clusterBitmap(context, category, cluster.size)),
+                        ),
+                    )
+                }
+                pinOptions += LabelOptions.from(position)
+                    .setStyles(styles)
+                    .setClickable(true)
+                    // 눌렀을 때 무엇을 펼칠지 되찾는 끈이다.
+                    .setTag(cluster)
+            } else {
+                val styles = pinStyles.getOrPut(single.category) {
+                    labels.addLabelStyles(LabelStyles.from(LabelStyle.from(pinBitmap(context, single.category))))
+                }
+                pinOptions += LabelOptions.from(position)
+                    .setStyles(styles)
+                    .setClickable(true)
+                    // 핀을 눌렀을 때 어느 장소인지 되찾는 유일한 끈이다.
+                    .setTag(single.placeId)
+                nameOptions += LabelOptions.from(position)
+                    .setStyles(nameStyles)
+                    .setTexts(LabelTextBuilder().setTexts(single.name))
+                    .setClickable(false)
+            }
+        }
+
+        pinLayer.addLabels(pinOptions)
+        if (nameOptions.isNotEmpty()) nameLayer.addLabels(nameOptions)
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
@@ -465,6 +528,97 @@ private fun pinColor(category: PlaceCategory) = when (category) {
     PlaceCategory.WILDLIFE_CENTER -> CategoryColor.WildlifeCenter
 }.toArgb()
 
+/**
+ * 핀을 얹을 레이어. **그림과 이름을 다른 레이어에 나눠 놓는다** (D-78).
+ *
+ * 한 레이어에 그림과 이름을 같이 두고 겹침 경쟁을 켜면, 진 쪽은 **이름만이 아니라 핀째로**
+ * 사라진다. 지도에서 장소가 통째로 없어지는 것과 이름 하나가 생략되는 것은 전혀 다른 일이다.
+ * - 그림 레이어: 경쟁 없음. 좌표가 있는 장소는 **반드시 점 하나로 보인다**
+ * - 이름 레이어: 경쟁 켬. 자리가 없으면 이름만 빠진다 (D-73 의 "이름이 서로 겹친다")
+ */
+private fun LabelManager.layerFor(
+    layerId: String,
+    competitionType: CompetitionType,
+    clickable: Boolean,
+): LabelLayer? =
+    // 이미 만들어 둔 레이어가 있으면 그것을 쓴다. 같은 id 로 다시 만들면 SDK 가 거절한다.
+    runCatching { getLayer(layerId) }.getOrNull()
+        ?: addLayer(
+            LabelLayerOptions.from(layerId)
+                .setCompetitionType(competitionType)
+                .setCompetitionUnit(CompetitionUnit.IconAndText)
+                .setClickable(clickable),
+        )
+
+/**
+ * 묶음을 눌렀을 때의 카메라. **확대 배율을 정해 놓지 않는다** — 그 묶음이 실제로 갈라지는
+ * 자리까지 맞춰야 한 번 눌러 안 갈라지는 일이 없다.
+ */
+private fun MapCluster.expandCamera(map: KakaoMap, paddingPx: Int): CameraUpdate =
+    if (isSinglePoint()) {
+        // 같은 건물에 여럿 있으면 아무리 당겨도 갈라지지 않는다. 그 자리로 한 단계만 다가서고
+        // 나머지는 시트의 목록이 말한다 — 눌러도 아무 일이 없는 것보다 낫다.
+        CameraUpdateFactory.newCenterPosition(
+            LatLng.from(latitude, longitude),
+            min(map.zoomLevel + EXPAND_STEP, map.maxZoomLevel),
+        )
+    } else {
+        CameraUpdateFactory.fitMapPoints(
+            pins.map { LatLng.from(it.latitude, it.longitude) }.toTypedArray(),
+            paddingPx,
+        )
+    }
+
+/**
+ * 묶음 그림 — 카테고리 색 원 + 개수. **개수를 그림 안에 그려 넣는다.**
+ * 라벨 글자는 그림 아래에 붙으므로, 개수를 글자로 얹으면 원 밑에 숫자가 떨어져 붙는다.
+ */
+private fun clusterBitmap(context: Context, category: PlaceCategory, count: Int): Bitmap {
+    val scale = context.resources.displayMetrics.density
+    val diameterDp = when {
+        count < 10 -> CLUSTER_SMALL_DP
+        count < 100 -> CLUSTER_MEDIUM_DP
+        else -> CLUSTER_LARGE_DP
+    }
+    val size = (diameterDp * scale).roundToInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = size / 2f
+    val ringWidth = CLUSTER_RING_DP * scale
+
+    canvas.drawCircle(center, center, center - ringWidth, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = pinColor(category)
+    })
+    canvas.drawCircle(center, center, center - ringWidth / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = ringWidth
+        color = CLUSTER_RING_COLOR
+    })
+
+    val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = CLUSTER_TEXT_COLOR
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.DEFAULT_BOLD
+        textSize = CLUSTER_TEXT_DP * scale
+    }
+    // baseline 은 글자의 아래쪽이다. 그대로 가운데에 두면 숫자가 아래로 치우쳐 보인다.
+    canvas.drawText(count.toString(), center, center - (text.descent() + text.ascent()) / 2f, text)
+    return bitmap
+}
+
+/**
+ * 이름 레이어가 쓰는 **투명한 핀 자리**. 그림과 같은 크기여야 이름이 지금까지와 같은 자리에 붙는다 —
+ * 없이 두면 이름이 핀 그림 위에 겹쳐 앉는다.
+ */
+private fun spacerBitmap(context: Context): Bitmap {
+    val drawable = requireNotNull(context.getDrawable(R.drawable.ic_map_pin))
+    return Bitmap.createBitmap(
+        drawable.intrinsicWidth.coerceAtLeast(1),
+        drawable.intrinsicHeight.coerceAtLeast(1),
+        Bitmap.Config.ARGB_8888,
+    )
+}
+
 /** 고른 지역이 없을 때의 첫 화면 — 남북으로 전국이 고르게 들어오는 자리다. */
 private val DEFAULT_CENTER = LatLng.from(36.3, 127.8)
 private const val NATIONWIDE_ZOOM = 7
@@ -476,6 +630,20 @@ private const val REGION_ZOOM = 14
  * 여백이 아니라 클러스터링(④)으로 푼다.
  */
 private val FIT_PADDING = 40.dp
+
+private const val PIN_LAYER_ID = "places"
+private const val NAME_LAYER_ID = "place-names"
+
+/** 묶음을 눌렀는데 갈라지지 않을 때 다가서는 단계. 한 번에 너무 당기면 어디였는지 놓친다. */
+private const val EXPAND_STEP = 2
+
+private const val CLUSTER_SMALL_DP = 36f
+private const val CLUSTER_MEDIUM_DP = 44f
+private const val CLUSTER_LARGE_DP = 52f
+private const val CLUSTER_RING_DP = 2.5f
+private const val CLUSTER_RING_COLOR = 0xFFFFFFFF.toInt()
+private const val CLUSTER_TEXT_COLOR = 0xFFFFFFFF.toInt()
+private const val CLUSTER_TEXT_DP = 15f
 
 private const val PIN_TEXT_SIZE = 26
 private const val PIN_TEXT_COLOR = 0xFF1A1A1A.toInt()
