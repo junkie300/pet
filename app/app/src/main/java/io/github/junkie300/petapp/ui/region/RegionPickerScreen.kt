@@ -3,6 +3,7 @@ package io.github.junkie300.petapp.ui.region
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -260,7 +261,13 @@ private fun RecentRegions(
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // ⚠️ **Row 로 두면 안 된다.** 칩 셋이 한 줄을 넘으면 마지막 칩이 남은 폭으로 눌려
+        // 글자가 한 자씩 세로로 쌓인다(실기기 실측 — `중구 필동2가 · 중구 충무로3가 · 강남구 삼성동`).
+        // 지역명 길이는 우리가 정하는 값이 아니므로 넘칠 때는 줄을 바꾼다.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             regions.forEach { region ->
                 FilterChip(
                     selected = false,

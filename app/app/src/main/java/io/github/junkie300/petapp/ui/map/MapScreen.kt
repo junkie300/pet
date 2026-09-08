@@ -470,7 +470,6 @@ private fun MapCanvas(
     val currentPinClick by rememberUpdatedState(onPinClick)
     val currentMapError by rememberUpdatedState(onMapError)
     val currentCenter by rememberUpdatedState(center)
-    val currentFitPadding by rememberUpdatedState(fitPaddingPx)
 
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
 
@@ -480,6 +479,7 @@ private fun MapCanvas(
     var zoomLevel by remember { mutableIntStateOf(REGION_ZOOM) }
 
     val cellPx = remember(density) { with(density) { MapClustering.CELL_DP.dp.roundToPx() } }
+    val currentCellPx by rememberUpdatedState(cellPx)
     val clusters = remember(pins, zoomLevel, cellPx) { MapClustering.cluster(pins, zoomLevel, cellPx) }
 
     val mapView = remember {
@@ -504,7 +504,7 @@ private fun MapCanvas(
                                 // 묶음 — 펼친다. 시트로도 상세로도 가지 않는다. 사용자가 물은 것은
                                 // "여기 뭐가 있나"이지 "그중 하나를 보여 달라"가 아니다.
                                 is MapCluster -> {
-                                    clicked.moveCamera(tag.expandCamera(clicked, currentFitPadding))
+                                    clicked.moveCamera(tag.expandCamera(clicked, currentCellPx))
                                     true
                                 }
 
@@ -706,23 +706,20 @@ private fun LabelManager.layerFor(
         )
 
 /**
- * 묶음을 눌렀을 때의 카메라. **확대 배율을 정해 놓지 않는다** — 그 묶음이 실제로 갈라지는
- * 자리까지 맞춰야 한 번 눌러 안 갈라지는 일이 없다.
+ * 묶음을 눌렀을 때의 카메라. **묶음이 실제로 갈라지는 배율까지** 당긴다 (D-83).
+ *
+ * ⚠️ **`fitMapPoints` 로는 안 된다.** 그 함수는 점들이 화면에 들어오게만 하고 채우도록 당겨 주지
+ * 않는다 — 방금 화면에 다 보이던 묶음이라 배율이 그대로고, 눌러도 같은 원이 다시 그려진다.
+ * 실기기 실측: 6개짜리 묶음(화면에서 171×181px)을 몇 번을 눌러도 배율이 15에서 안 움직였다.
+ * 갈라지는 자리는 [MapClustering.zoomToSplit] 이 계산한다 — 묶는 규칙을 아는 쪽이 거기다.
  */
-private fun MapCluster.expandCamera(map: KakaoMap, paddingPx: Int): CameraUpdate =
-    if (isSinglePoint()) {
-        // 같은 건물에 여럿 있으면 아무리 당겨도 갈라지지 않는다. 그 자리로 한 단계만 다가서고
-        // 나머지는 시트의 목록이 말한다 — 눌러도 아무 일이 없는 것보다 낫다.
-        CameraUpdateFactory.newCenterPosition(
-            LatLng.from(latitude, longitude),
-            min(map.zoomLevel + EXPAND_STEP, map.maxZoomLevel),
-        )
-    } else {
-        CameraUpdateFactory.fitMapPoints(
-            pins.map { LatLng.from(it.latitude, it.longitude) }.toTypedArray(),
-            paddingPx,
-        )
-    }
+private fun MapCluster.expandCamera(map: KakaoMap, cellPx: Int): CameraUpdate {
+    // 같은 건물에 여럿 있으면 아무리 당겨도 안 갈라진다. 그때는 그 자리로 한 단계만 다가서고
+    // 나머지는 시트의 목록이 말한다 — 눌러도 아무 일이 없는 것보다 낫다.
+    val zoom = MapClustering.zoomToSplit(pins, map.zoomLevel, cellPx, map.maxZoomLevel)
+        ?: min(map.zoomLevel + EXPAND_STEP, map.maxZoomLevel)
+    return CameraUpdateFactory.newCenterPosition(LatLng.from(latitude, longitude), zoom)
+}
 
 /**
  * 묶음 그림 — 카테고리 색 원 + 개수. **개수를 그림 안에 그려 넣는다.**

@@ -26,7 +26,7 @@ Android Studio 에서 **`D:\pet\app`** 을 연다 (`D:\pet` 이 아니다).
 ## 명령
 
 ```
-gradlew testDebugUnitTest     # 단위 테스트 54개 (기기·네트워크 불필요)
+gradlew testDebugUnitTest     # 단위 테스트 55개 (기기·네트워크 불필요)
 gradlew assembleDebug         # debug APK
 gradlew installDebug          # 연결된 기기/에뮬레이터에 설치
 gradlew assembleRelease       # R8 적용 release APK (서명 없음, 43.8MB — 유니버설. AAB 는 기기당 23~26MB · D-72)

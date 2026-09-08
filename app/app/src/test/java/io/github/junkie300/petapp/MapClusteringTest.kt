@@ -96,9 +96,34 @@ class MapClusteringTest {
         assertEquals(pins.map { it.longitude }.average(), result[0].longitude, 1e-9)
     }
 
+    /**
+     * 묶음을 누르면 **갈라지는 배율까지** 당긴다 (D-83). 한 단계 올려 봐야 그대로인 묶음이
+     * 대부분이라, "지금보다 한 단계"로는 눌러도 아무 일이 없다.
+     */
+    @Test
+    fun `갈라지는 배율을 찾아 준다`() {
+        val all = pins(60)
+        val big = MapClustering.cluster(all, zoomLevel = 12, cellPx = cellPx).maxBy { it.size }
+
+        val zoom = MapClustering.zoomToSplit(big.pins, fromZoom = 12, cellPx = cellPx, maxZoom = 21)
+
+        assertNotNull("흩어진 묶음은 언젠가 갈라진다", zoom)
+        assertTrue("지금보다 더 당겨야 한다", zoom!! > 12)
+        // 그 배율에서 이 묶음은 더 이상 한 덩어리가 아니다 — 눌렀는데 같은 원이 다시 뜨면 안 된다.
+        assertTrue(
+            "갈라져야 한다",
+            MapClustering.cluster(all, zoom, cellPx).none { it.pins.containsAll(big.pins) },
+        )
+        // **가장 낮은** 배율이어야 한 번에 너무 당기지 않는다 — 직전 배율까지는 한 덩어리다.
+        assertTrue(
+            "한 단계 덜 당긴 자리에서는 그대로여야 한다",
+            MapClustering.cluster(all, zoom - 1, cellPx).any { it.pins.containsAll(big.pins) },
+        )
+    }
+
     /** 같은 건물에 여럿 있으면 아무리 확대해도 갈라지지 않는다. 그때는 카메라를 달리 움직인다. */
     @Test
-    fun `한 점에 겹친 묶음을 알아본다`() {
+    fun `한 점에 겹친 묶음은 갈라지는 배율이 없다`() {
         val same = List(60) { i ->
             MapPin(i.toLong(), "장소 $i", baseLat, baseLng, PlaceCategory.HOSPITAL)
         }
@@ -106,9 +131,11 @@ class MapClusteringTest {
         val result = MapClustering.cluster(same, zoomLevel = 21, cellPx = cellPx)
 
         assertEquals(1, result.size)
-        assertTrue(result[0].isSinglePoint())
         assertNull("여럿이므로 핀 하나짜리가 아니다", result[0].single)
-        assertFalse(MapClustering.cluster(pins(60), 12, cellPx).first().isSinglePoint())
+        assertNull(
+            "아무리 당겨도 안 갈라진다 — 부르는 쪽이 카메라를 달리 움직여야 한다",
+            MapClustering.zoomToSplit(same, fromZoom = 12, cellPx = cellPx, maxZoom = 21),
+        )
     }
 
     /**

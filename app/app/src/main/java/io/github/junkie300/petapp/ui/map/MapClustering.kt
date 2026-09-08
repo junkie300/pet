@@ -1,7 +1,6 @@
 package io.github.junkie300.petapp.ui.map
 
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.tan
@@ -42,10 +41,7 @@ object MapClustering {
         val world = worldSizePx(zoomLevel)
         val grouped = LinkedHashMap<Long, MutableList<MapPin>>()
         for (pin in pins) {
-            val x = floor(worldX(pin.longitude, world) / cell).toLong()
-            val y = floor(worldY(pin.latitude, world) / cell).toLong()
-            // 격자 좌표 두 개를 키 하나로. y 는 배율 22 에서도 2^30 을 넘지 않는다.
-            grouped.getOrPut(x * KEY_STRIDE + y) { mutableListOf() } += pin
+            grouped.getOrPut(cellKey(pin, world, cell)) { mutableListOf() } += pin
         }
         return grouped.values.map { group ->
             // 묶음의 자리는 무게중심이다. 격자 한가운데에 찍으면 핀이 없는 빈 땅에 원이 뜬다.
@@ -55,6 +51,35 @@ object MapClustering {
                 pins = group,
             )
         }
+    }
+
+    /**
+     * 이 핀들이 **실제로 갈라지는** 가장 낮은 배율. 아무리 당겨도 안 갈라지면 null 이다
+     * (같은 건물에 여럿 있는 경우).
+     *
+     * ⚠️ **묶음을 펼칠 때 `fitMapPoints` 를 쓰면 안 된다** (D-83). 카카오맵 2.15.1 의 그 함수는
+     * 점들이 화면에 **들어오게만** 하고 화면을 채우도록 당겨 주지는 않는다 — 방금 화면에 다 보이는
+     * 묶음을 누른 것이므로 배율이 그대로고, 같은 원이 다시 그려진다. 눌러도 아무 일이 없는 것이다.
+     * **어디까지 당겨야 갈라지는지는 우리가 안다** — 묶는 규칙이 여기 있으니 여기서 계산한다.
+     *
+     * @param fromZoom 지금 배율. 여기서 한 단계 위부터 찾는다.
+     * @param maxZoom 지도가 허용하는 최대 배율.
+     */
+    fun zoomToSplit(pins: List<MapPin>, fromZoom: Int, cellPx: Int, maxZoom: Int): Int? {
+        if (pins.size < 2) return null
+        val cell = cellPx.coerceAtLeast(1)
+        for (zoom in (fromZoom + 1)..minOf(maxZoom, MAX_ZOOM)) {
+            val world = worldSizePx(zoom)
+            if (pins.mapTo(HashSet()) { cellKey(it, world, cell) }.size > 1) return zoom
+        }
+        return null
+    }
+
+    /** 격자 좌표 두 개를 키 하나로. y 는 배율 22 에서도 2^30 을 넘지 않는다. */
+    private fun cellKey(pin: MapPin, world: Double, cell: Int): Long {
+        val x = floor(worldX(pin.longitude, world) / cell).toLong()
+        val y = floor(worldY(pin.latitude, world) / cell).toLong()
+        return x * KEY_STRIDE + y
     }
 
     /** 배율 [zoomLevel] 에서 세계 지도 한 장의 한 변(px). 카카오맵도 256px 타일을 쓴다. */
@@ -99,13 +124,4 @@ data class MapCluster(
     val dominantCategory get() = pins.groupingBy { it.category }.eachCount()
         .maxByOrNull { it.value }!!.key
 
-    /** 한 점에 모여 있는 묶음인가. 그렇다면 더 확대해도 갈라지지 않는다. */
-    fun isSinglePoint(): Boolean = pins.all {
-        abs(it.latitude - pins[0].latitude) < SAME_POINT && abs(it.longitude - pins[0].longitude) < SAME_POINT
-    }
-
-    private companion object {
-        /** 약 1m. 같은 건물에 여러 병원이 있으면 좌표가 글자까지 같다. */
-        const val SAME_POINT = 1e-5
-    }
 }
