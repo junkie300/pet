@@ -13,10 +13,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +41,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,6 +70,7 @@ import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.label.LabelTextBuilder
 import io.github.junkie300.petapp.R
+import io.github.junkie300.petapp.data.GeoPoint
 import io.github.junkie300.petapp.data.Place
 import io.github.junkie300.petapp.data.PlaceCategory
 import io.github.junkie300.petapp.data.Region
@@ -73,7 +81,9 @@ import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
 import io.github.junkie300.petapp.ui.common.labelRes
+import io.github.junkie300.petapp.ui.common.rememberLocationPermissionRequest
 import io.github.junkie300.petapp.ui.place.DistanceRow
+import io.github.junkie300.petapp.ui.place.LocateState
 import io.github.junkie300.petapp.ui.place.PlaceListUiState
 import io.github.junkie300.petapp.ui.place.PlaceListViewModel
 import io.github.junkie300.petapp.ui.place.placeItems
@@ -122,6 +132,7 @@ fun MapScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val origin by viewModel.origin.collectAsStateWithLifecycle()
+    val locate by viewModel.locate.collectAsStateWithLifecycle()
     val ready = state as? PlaceListUiState.Ready
 
     val places = ((ready?.places as? UiState.Success)?.data).orEmpty()
@@ -142,6 +153,42 @@ fun MapScreen(
     // 지도에서 고른 핀. 시트에서 그 카드가 강조된다. **상세로 바로 가지 않는다** — 핀 하나를
     // 누른 것으로 화면을 통째로 바꾸면 지도를 훑어보던 맥락이 끊긴다 (D-74).
     var selectedPlaceId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    // "현재 위치로" (D-82). 카메라를 옮길 자리와, 못 옮겼을 때 그 자리에 적을 이유.
+    var cameraTarget by remember { mutableStateOf<CameraTarget?>(null) }
+    var locateNotice by remember { mutableStateOf<Int?>(null) }
+    // 눌렀다는 사실을 기억해 둔다. 위치는 최대 8초 뒤에 오므로(D-81) 결과를 받을 사람이 필요하다.
+    var locateRequested by remember { mutableStateOf(false) }
+    val askLocationPermission = rememberLocationPermissionRequest { granted ->
+        if (granted) {
+            locateRequested = true
+            viewModel.refreshLocation()
+        } else {
+            locateNotice = R.string.map_locate_denied
+        }
+    }
+
+    // 위치가 오면(또는 못 잡았다고 판명되면) 그때 한 번 움직인다.
+    // ⚠️ **[origin] 만 보고 움직이면 안 된다.** 목록 쪽 `거리 보기` 로 위치가 들어오는 길도
+    // 있는데, 그때 지도가 제멋대로 따라가면 보고 있던 동네에서 밀려난다.
+    LaunchedEffect(locateRequested, origin, locate) {
+        if (!locateRequested) return@LaunchedEffect
+        val point = origin
+        when {
+            // 마지막으로 알려진 위치라도 있으면 그 자리로 간다 — 캐시 우선과 같은 생각이다 (D-79).
+            point != null -> {
+                cameraTarget = CameraTarget(point, (cameraTarget?.serial ?: 0) + 1)
+                locateRequested = false
+            }
+
+            locate == LocateState.FAILED -> {
+                locateNotice = R.string.map_locate_failed
+                locateRequested = false
+            }
+
+            else -> Unit
+        }
+    }
 
     val sheetState = rememberPlaceSheetState()
     val listState = rememberLazyListState()
@@ -169,6 +216,8 @@ fun MapScreen(
         MapCanvas(
             center = regionCenter,
             pins = pins,
+            target = cameraTarget,
+            myLocation = origin,
             topInsetPx = noticeHeightPx,
             bottomInsetPx = sheetInsetPx,
             onPinClick = { placeId -> selectedPlaceId = placeId },
@@ -191,7 +240,30 @@ fun MapScreen(
             mapError?.let { error ->
                 MapNotice(text = stringResource(R.string.map_error, error), emphasis = true)
             }
+            locateNotice?.let { MapNotice(text = stringResource(it)) }
         }
+
+        // 시트 위에 뜬다. 시트를 올리면 그 뒤로 숨는데, 그때는 목록이 주인공이라 괜찮다.
+        MyLocationButton(
+            working = locate == LocateState.WORKING,
+            onClick = {
+                locateNotice = null
+                // 이미 허용돼 있으면 묻지 않는다. 매번 창을 띄우면 `대략` 만 허용한 사람은
+                // 누를 때마다 같은 창을 다시 본다 — 정확한 위치를 안 준 것이 잘못처럼 읽힌다.
+                if (viewModel.hasLocationPermission) {
+                    locateRequested = true
+                    viewModel.refreshLocation()
+                } else {
+                    askLocationPermission()
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = Spacing.screenHorizontal,
+                    bottom = maxHeight * SheetDetent.PEEK.visibleFraction + 16.dp,
+                ),
+        )
 
         PlaceSheet(
             state = sheetState,
@@ -313,6 +385,45 @@ private fun MapNotice(content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * `현재 위치로` (spec.md §5.2 · D-82).
+ *
+ * ⚠️ **누르고 나서 8초까지 기다릴 수 있다** (D-81 의 제공자별 대기). 그동안 버튼이 그대로면
+ * 안 눌린 줄 알고 계속 누르게 되므로, 도는 동안에는 아이콘 자리에 표시를 돌린다.
+ */
+@Composable
+private fun MyLocationButton(
+    working: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(R.string.cd_my_location)
+    SmallFloatingActionButton(
+        onClick = onClick,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.semantics { contentDescription = label },
+    ) {
+        if (working) {
+            CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp),
+            )
+        } else {
+            Icon(imageVector = Icons.Outlined.MyLocation, contentDescription = null)
+        }
+    }
+}
+
+/**
+ * 카메라를 옮길 자리.
+ *
+ * ⚠️ **일련번호가 있어야 한다.** 같은 자리에서 버튼을 두 번 누르면 좌표가 그대로라
+ * `LaunchedEffect` 가 다시 돌지 않는다 — 지도를 손으로 밀어 놓고 다시 눌렀을 때
+ * 아무 일도 안 일어나는 것이 바로 그 경우다.
+ */
+private data class CameraTarget(val point: GeoPoint, val serial: Int)
+
 /** 지도에 찍을 한 점. 좌표가 없는 장소는 여기까지 오지 못한다. */
 data class MapPin(
     val placeId: Long,
@@ -338,6 +449,10 @@ private fun List<Place>.toPins(fallbackCategory: PlaceCategory): List<MapPin> = 
 private fun MapCanvas(
     center: LatLng?,
     pins: List<MapPin>,
+    /** `현재 위치로` 가 가리키는 자리. null 이면 카메라를 건드리지 않는다. */
+    target: CameraTarget?,
+    /** 현재 위치. 파란 점 하나로 찍는다 — 옮겨 놓고 어디로 왔는지 안 보이면 소용이 없다. */
+    myLocation: GeoPoint?,
     /** 상단 알림에 가려지는 높이(px). 카메라가 이만큼을 빼고 화면을 잡는다. */
     topInsetPx: Int,
     /** 바텀시트에 가려지는 높이(px). 같은 이유로 아래쪽도 빼 준다. */
@@ -448,6 +563,38 @@ private fun MapCanvas(
             } else {
                 CameraUpdateFactory.fitMapPoints(points, fitPaddingPx)
             },
+        )
+    }
+
+    // `현재 위치로`. **핀 카메라(위)와 따로 둔다** — 같은 자리에 넣으면 목록이 갱신될 때마다
+    // 현재 위치로 다시 끌려간다.
+    LaunchedEffect(kakaoMap, target) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        val point = target?.point ?: return@LaunchedEffect
+        map.moveCamera(
+            CameraUpdateFactory.newCenterPosition(
+                LatLng.from(point.latitude, point.longitude),
+                MY_LOCATION_ZOOM,
+            ),
+        )
+    }
+
+    // 내 위치 점. 장소 핀과 **다른 레이어**에 둔다 — 경쟁에 지면 사라지는 자리에 두면
+    // 정작 옮겨 간 뒤에 점이 없다.
+    LaunchedEffect(kakaoMap, myLocation) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        val labels = map.labelManager ?: return@LaunchedEffect
+        val layer = labels.layerFor(ME_LAYER_ID, CompetitionType.None, clickable = false)
+            ?: return@LaunchedEffect
+        layer.removeAll()
+        val point = myLocation ?: return@LaunchedEffect
+        val styles = labels.addLabelStyles(
+            LabelStyles.from(LabelStyle.from(myLocationBitmap(context))),
+        ) ?: return@LaunchedEffect
+        layer.addLabel(
+            LabelOptions.from(LatLng.from(point.latitude, point.longitude))
+                .setStyles(styles)
+                .setClickable(false),
         )
     }
 
@@ -615,6 +762,31 @@ private fun clusterBitmap(context: Context, category: PlaceCategory, count: Int)
 }
 
 /**
+ * 내 위치 점 — 파란 원에 흰 테. 지도앱들이 오래 써 온 그림이라 설명이 필요 없다.
+ *
+ * ⚠️ **카테고리 5색을 쓰지 않는다.** 파란 점이 관광(`CategoryColor.Tour`) 핀과 같은 색이면
+ * 내 위치가 장소 하나로 읽힌다. 지도 바탕은 테마와 무관하게 밝으므로 다크 짝도 두지 않는다.
+ */
+private fun myLocationBitmap(context: Context): Bitmap {
+    val scale = context.resources.displayMetrics.density
+    val size = (MY_LOCATION_DP * scale).roundToInt()
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = size / 2f
+    val ring = MY_LOCATION_RING_DP * scale
+
+    canvas.drawCircle(center, center, center - ring / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = MY_LOCATION_COLOR
+    })
+    canvas.drawCircle(center, center, center - ring / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = ring
+        color = MY_LOCATION_RING_COLOR
+    })
+    return bitmap
+}
+
+/**
  * 이름 레이어가 쓰는 **투명한 핀 자리**. 그림과 같은 크기여야 이름이 지금까지와 같은 자리에 붙는다 —
  * 없이 두면 이름이 핀 그림 위에 겹쳐 앉는다.
  */
@@ -641,6 +813,7 @@ private val FIT_PADDING = 40.dp
 
 private const val PIN_LAYER_ID = "places"
 private const val NAME_LAYER_ID = "place-names"
+private const val ME_LAYER_ID = "my-location"
 
 /** 묶음을 눌렀는데 갈라지지 않을 때 다가서는 단계. 한 번에 너무 당기면 어디였는지 놓친다. */
 private const val EXPAND_STEP = 2
@@ -652,6 +825,18 @@ private const val CLUSTER_RING_DP = 2.5f
 private const val CLUSTER_RING_COLOR = 0xFFFFFFFF.toInt()
 private const val CLUSTER_TEXT_COLOR = 0xFFFFFFFF.toInt()
 private const val CLUSTER_TEXT_DP = 15f
+
+/**
+ * `현재 위치로` 의 배율. 지역을 볼 때(14)보다 한참 가깝다 — 이 버튼을 누른 사람이 알고 싶은 것은
+ * "내가 지금 어디쯤인가"이지 동네의 전체 그림이 아니다.
+ */
+private const val MY_LOCATION_ZOOM = 16
+
+private const val MY_LOCATION_DP = 18f
+private const val MY_LOCATION_RING_DP = 3f
+/** 지도앱의 관용 파랑. 카테고리 5색과 겹치지 않는 값이어야 한다. */
+private const val MY_LOCATION_COLOR = 0xFF1A73E8.toInt()
+private const val MY_LOCATION_RING_COLOR = 0xFFFFFFFF.toInt()
 
 private const val PIN_TEXT_SIZE = 26
 private const val PIN_TEXT_COLOR = 0xFF1A1A1A.toInt()

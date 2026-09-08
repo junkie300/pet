@@ -1,8 +1,5 @@
 package io.github.junkie300.petapp.ui.place
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +14,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.GeoPoint
+import io.github.junkie300.petapp.ui.common.rememberLocationPermissionRequest
 
 /**
  * 거리 표기를 켜는 줄 (`spec.md §6.4`, D-81).
@@ -47,18 +44,9 @@ fun DistanceRow(
     // 거절당한 뒤에도 버튼은 남긴다. 두 번째 누름은 시스템이 창을 안 띄울 수 있으므로,
     // **왜 안 뜨는지**를 그 자리에 적어 준다 — 버튼만 멀쩡히 있으면 고장으로 읽힌다.
     var denied by rememberSaveable { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { granted ->
-        if (granted.values.any { it }) {
-            denied = false
-            onLocationGranted()
-        } else {
-            denied = true
-        }
-    }
-    val permissions = remember {
-        arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
+    val ask = rememberLocationPermissionRequest { granted ->
+        denied = !granted
+        if (granted) onLocationGranted()
     }
 
     Row(
@@ -66,7 +54,7 @@ fun DistanceRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        TextButton(onClick = { launcher.launch(permissions) }) {
+        TextButton(onClick = ask) {
             Icon(
                 imageVector = Icons.Outlined.MyLocation,
                 contentDescription = null,

@@ -49,6 +49,9 @@ sealed interface PlaceListUiState {
     ) : PlaceListUiState
 }
 
+/** 위치를 잡는 일의 결말. 자세한 것은 [PlaceListViewModel.locate] 에 적어 두었다. */
+enum class LocateState { IDLE, WORKING, FAILED }
+
 /**
  * 목록 화면과 지도가 **같이 쓰는** ViewModel (D-26·D-76).
  *
@@ -78,6 +81,19 @@ class PlaceListViewModel(
      */
     private val _origin = MutableStateFlow<GeoPoint?>(null)
     val origin: StateFlow<GeoPoint?> = _origin.asStateFlow()
+
+    /**
+     * 위치를 잡는 일이 어떻게 됐는지 (D-82).
+     *
+     * ⚠️ **[origin] 하나로는 부족하다.** null 은 "아직 안 물어봤다"와 "물어봤는데 못 잡았다"를
+     * 구분하지 못하는데, 지도의 `현재 위치로` 는 뒤엣것을 화면에 적어 줘야 한다 — 눌렀는데
+     * 아무 일도 안 일어나는 버튼은 고장으로 읽힌다 (`spec.md §5.3` 이 가르라고 한 그 구분이다).
+     */
+    private val _locate = MutableStateFlow(LocateState.IDLE)
+    val locate: StateFlow<LocateState> = _locate.asStateFlow()
+
+    /** 지금 위치 권한이 있는가. 버튼이 **물어볼지 바로 잡을지**를 이걸로 정한다. */
+    val hasLocationPermission: Boolean get() = deviceLocation.hasPermission
 
     private var currentCode: String? = null
 
@@ -123,11 +139,20 @@ class PlaceListViewModel(
     fun retry() = load(currentCode)
 
     /**
-     * 현재 위치를 다시 잡는다. 권한을 방금 받았을 때와 화면에 다시 들어왔을 때 부른다.
-     * **못 얻어도 조용하다** — 거리는 없으면 없는 대로 그린다.
+     * 현재 위치를 다시 잡는다. 권한을 방금 받았을 때와 `현재 위치로`(D-82)를 눌렀을 때 부른다.
+     *
+     * ⚠️ **못 잡았다고 이전 위치를 지우지 않는다.** 방금 전 위치라도 거리 표기에는 그대로 쓸
+     * 만하고, 화면에 붙어 있던 `320m` 가 실패 한 번에 사라지면 고장으로 읽힌다.
      */
     fun refreshLocation() {
-        viewModelScope.launch { _origin.value = deviceLocation.current() }
+        // 두 번 눌러도 조회는 하나만 돈다. 제공자를 하나씩 물어보느라 최대 8초가 걸린다 (D-81).
+        if (_locate.value == LocateState.WORKING) return
+        viewModelScope.launch {
+            _locate.value = LocateState.WORKING
+            val point = deviceLocation.current()
+            if (point != null) _origin.value = point
+            _locate.value = if (point == null) LocateState.FAILED else LocateState.IDLE
+        }
     }
 
     /**

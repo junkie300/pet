@@ -56,6 +56,11 @@
     <string name="distance_denied">위치 권한이 필요합니다</string>
     <string name="map_chip_pending">%1$s · 준비 중</string>
     <string name="map_empty_multi">이 지역에는 고른 카테고리의 장소가 없습니다</string>
+    <!-- 지도의 "현재 위치로" (spec.md §5.2 · D-82). 눌러서 아무 일도 안 일어나면 고장으로
+         읽히므로, 못 간 이유는 그때마다 지도 위에 한 줄로 적는다 -->
+    <string name="cd_my_location">현재 위치로</string>
+    <string name="map_locate_denied">위치 권한이 없어 현재 위치로 갈 수 없습니다</string>
+    <string name="map_locate_failed">현재 위치를 찾지 못했습니다. 실내에서는 잘 안 잡힙니다</string>
     <!-- 바텀시트 손잡이. 끌어서 3단(peek·half·full), 눌러도 다음 단으로 간다 -->
     <string name="cd_sheet_handle">목록 펼치기</string>
 
