@@ -1,12 +1,13 @@
 name: etl
 
-# 지금 돌릴 수 있는 것: mapping, coords (둘 다 수동 실행)
+# 지금 돌릴 수 있는 것: mapping, coords, hospitals (전부 수동 실행)
 #
 # regions 는 법정동코드 파일(etl/data/, 커밋 제외)이 필요하므로 로컬에서만 돌린다.
-# places 는 1단계에서 만든다.
+# localdata(자치단체코드)는 etl/docs/ 엑셀을 읽고 이미 다 찼다 — 여기서 돌릴 일이 없다.
 #
-# 정기 실행(cron)은 1단계 places 가 생긴 뒤에 켠다.
-# LOCALDATA 는 월~토 19:00(KST) 갱신되므로 그 이후인 20:30 KST = 11:30 UTC 가 적당하다.
+# ⚠️ 정기 실행(cron)은 **아직 켜지 않았다.** 켜면 매일 운영 DB 에 쓴다 — 사람이 정할 일이라
+# 주석으로 둔다 (plan.md 1단계 'GitHub Actions cron'). 켤 때는 아래 schedule 의 주석을 푼다.
+# 원본은 월~토 19:00(KST) 갱신되므로 그 이후인 20:30 KST = 11:30 UTC 가 적당하다.
 
 on:
   workflow_dispatch:
@@ -17,16 +18,16 @@ on:
         default: mapping
         type: choice
         options:
-          - mapping   # regions 에 APMS·TourAPI 지역코드 매핑 (DATA_GO_KR_KEY 필요)
-          - coords    # 읍면동 중심좌표 (KAKAO_REST_API_KEY 필요)
-          - places    # 1단계에서 구현
+          - mapping     # regions 에 APMS·TourAPI 지역코드 매핑 (DATA_GO_KR_KEY 필요)
+          - coords      # 읍면동 중심좌표 (KAKAO_REST_API_KEY 필요)
+          - hospitals   # 동물병원 → places (DATA_GO_KR_KEY + KAKAO_REST_API_KEY, 약 10분)
       dry_run:
         description: DB 에 쓰지 않고 결과만 확인
         required: false
         default: false
         type: boolean
   # schedule:
-  #   - cron: "30 11 * * 1-6"   # 1단계에서 주석 해제
+  #   - cron: "30 11 * * 1-6"   # 켤 때 주석 해제 (매일 운영 DB 에 쓴다)
 
 jobs:
   sync:
@@ -42,7 +43,8 @@ jobs:
       # 반드시 Decoding 키를 Secret 에 넣는다 (Encoding 키는 이중 인코딩으로 실패).
       DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
       KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
-      LOCALDATA_API_KEY: ${{ secrets.LOCALDATA_API_KEY }}
+      # LOCALDATA_API_KEY 는 없앴다 — localdata.go.kr 이 2026-04-16 에 닫혔고 인허가 데이터는
+      # 공공데이터포털로 통합됐다. 2단계 미용업(15154944)도 DATA_GO_KR_KEY 로 부른다 (D-93).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,14 +54,7 @@ jobs:
           cache-dependency-path: etl/requirements.txt
       - run: pip install -r requirements.txt
 
-      - name: places 는 아직 없다
-        if: inputs.source == 'places'
-        run: |
-          echo "::error::places 는 1단계에서 구현한다."
-          exit 1
-
       - name: sync
-        if: inputs.source != 'places'
         run: python run.py ${{ inputs.source }} ${{ inputs.dry_run && '--dry-run' || '' }}
 
       # 실패는 sync_logs 에도 남지만, 알림이 없으면 며칠씩 모른 채로 지나간다.
