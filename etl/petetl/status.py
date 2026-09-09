@@ -31,10 +31,12 @@ def _pad(text: str, width: int) -> str:
 ENV_KEYS = [
     ("SUPABASE_URL", "전부 — DB 에 접속할 수 없다"),
     ("SUPABASE_SERVICE_ROLE_KEY", "전부 — 쓰기가 RLS 에 막힌다"),
-    ("DATA_GO_KR_KEY", "mapping — APMS·TourAPI 지역코드"),
+    ("DATA_GO_KR_KEY", "mapping · hospitals · grooming — 공공데이터포털 전부"),
     ("KAKAO_REST_API_KEY", "coords — 읍면동 중심좌표"),
-    ("LOCALDATA_API_KEY", "localdata_cd · 1·2단계 동물병원/미용"),
 ]
+# ⚠️ LOCALDATA_API_KEY 는 없앴다. **LOCALDATA(localdata.go.kr) 는 2026-04-16 에 닫혔고**
+# 인허가 데이터는 공공데이터포털로 옮겨졌다 (D-93). 우리가 쓰는 동물병원(15154952)은
+# 처음부터 공공데이터포털이었고, 2단계 미용업(15154944)도 같은 키로 부른다.
 
 # (컬럼, 라벨, 모수 level) — level 이 None 이면 regions 전체가 모수다.
 # 중심좌표는 읍면동에만 채운다. 모수를 전체(5,339)로 잡으면 시도·시군구 272행 때문에
@@ -44,7 +46,8 @@ COLUMNS = [
     ("apms_org_cd", "APMS 시군구", None),
     ("tour_area_cd", "TourAPI area", None),
     ("tour_sigungu_cd", "TourAPI sigungu", None),
-    ("localdata_cd", "LOCALDATA", None),
+    # 컬럼 이름은 그대로 두되 라벨은 바꿨다 — LOCALDATA 라는 사이트가 이제 없다 (D-93).
+    ("localdata_cd", "자치단체코드", None),
     ("center_lat", "중심좌표", 3),
 ]
 
@@ -190,7 +193,6 @@ def _next_steps(client) -> list[str]:
         steps.append("  · python run.py hospitals       (동물병원이 아직 없다)")
 
     if not steps:
-        steps.append("  · ETL 은 할 일이 없다. 1단계 앱 화면도 지도(S-02)만 남았다 — 카카오 네이티브 앱 키 대기")
-        if not os.getenv("LOCALDATA_API_KEY", "").strip():
-            steps.append("  · 2단계(미용)를 시작하려면 LOCALDATA 인증키가 필요하다")
+        steps.append("  · ETL 은 할 일이 없다. 1단계 앱 화면은 다 찼다 (D-91·D-92 는 실기기 확인만 남았다)")
+        steps.append("  · 2단계(미용)는 공공데이터포털 15154944 활용신청(자동승인)이면 시작할 수 있다 (D-93)")
     return steps

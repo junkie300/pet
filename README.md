@@ -204,7 +204,8 @@ tools/
 ### 병행 트랙
 
 - [x] 공공데이터포털 인증키 — 발급 완료 (국가동물보호정보시스템 15098931 · TourAPI 15101578)
-- [ ] **LOCALDATA 인증키** — localdata.go.kr 은 공공데이터포털과 **별도 사이트·별도 가입**
+- [x] ~~**LOCALDATA 인증키**~~ — **없어졌다.** localdata.go.kr 은 2026-04-16 에 닫혔고 인허가
+      데이터는 공공데이터포털로 갔다 (D-93). 2단계는 **이미 있는 `DATA_GO_KR_KEY`** 로 연다
 - [x] **카카오 개발자 키 2종** — 앱 하나에서 둘 다 나온다. 2026-09-06 에 둘 다 끝났다
       · **REST API 키** — ✅ `etl/.env` (좌표 ETL 이 쓴다)
       · **네이티브 앱 키** — ✅ 발급 + **콘솔에 Android 플랫폼 등록까지 완료**
@@ -231,9 +232,9 @@ cd D:\pet\etl
 |---|---|---|
 | `SUPABASE_URL` | ✅ | 전부 |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | 전부 (반드시 **legacy `service_role`**) |
-| `DATA_GO_KR_KEY` | ✅ | `mapping` (APMS·TourAPI) |
+| `DATA_GO_KR_KEY` | ✅ | `mapping` (APMS·TourAPI) · `hospitals` · **2단계 미용업**(D-93) |
 | `KAKAO_REST_API_KEY` | ✅ | `coords` (읍면동 중심좌표) |
-| `LOCALDATA_API_KEY` | ❌ | 2단계 미용시설 (`localdata_cd` 는 문서로 이미 끝냈다) |
+| ~~`LOCALDATA_API_KEY`~~ | — | **없앴다** — 사이트가 닫혔다 (D-93). 2단계도 `DATA_GO_KR_KEY` 를 쓴다 |
 
 앱은 `.env` 가 아니라 **`app/local.properties`** 를 쓴다 (`app/local.properties.example` 참고).
 
@@ -296,7 +297,7 @@ gradlew installDebug          # 에뮬레이터/기기에 설치
 | `python run.py regions` | 법정동코드 → `regions` (**로컬 전용**, `etl/data/` 파일 필요) | Supabase |
 | `python run.py mapping` | APMS·TourAPI 지역코드 매핑 | `DATA_GO_KR_KEY` |
 | `python run.py coords --limit 50` | 읍면동 중심좌표 | `KAKAO_REST_API_KEY` |
-| `python run.py localdata` | LOCALDATA 자치단체코드 매핑 | **없음** (`etl/docs/` 엑셀) |
+| `python run.py localdata` | 개방자치단체코드 매핑 (다 찼다 · D-93) | **없음** (`etl/docs/` 엑셀) |
 | `python run.py hospitals` | 동물병원 → `places` (10,617건, 약 10분) | `DATA_GO_KR_KEY` + `KAKAO_REST_API_KEY` |
 
 `--dry-run` 을 붙이면 DB 에 쓰지 않는다. `mapping`·`coords` 는 GitHub Actions
@@ -319,9 +320,14 @@ S-01 의 마지막 한 줄인 **「현재 위치로」**(D-91)까지 닫았다. 
 
 #### A. 지금 이어서 할 코드 ← **여기서 시작한다**
 
-1. **2단계 미용시설** ← **키가 오면 여기부터** — LOCALDATA 인증키가 필요하다 (아래 C).
+1. **2단계 미용시설** ← **여기부터. 더 기다릴 것이 없다** (D-93).
    여기서 `plan.md` 의 진짜 시험이 시작된다 — **앱 코드 수정이 "필터 칩 1줄" 수준이어야 한다**
-   · ⚠️ **LOCALDATA API 는 변경분만 준다.** 전체분은 다운로드 페이지에서 받는다 (§5 아래 경고)
+   · 원천은 **공공데이터포털 `15154944`**(행정안전부_동물_동물미용업). **자동승인**이고
+     인증키는 **이미 있는 `DATA_GO_KR_KEY`** 다 — 사람이 할 일은 활용신청 한 번뿐이다 (아래 C)
+   · 엔드포인트는 `https://apis.data.go.kr/1741000/pet_grooming/info` 로 보인다(게이트웨이가
+     403 = 미신청으로 답한다. 없는 이름은 400). 신청하면 마이페이지가 최종 주소를 확정해 준다
+   · **동물병원(15154952)의 형제 서비스**라 응답 필드·EPSG:5174·영업상태코드가 같다 →
+     `etl/petetl/sources/hospitals.py` 를 카테고리만 바꿔 재사용하는 것이 목표다
    · 이때 클러스터링(④)이 강남·서초에서 **처음으로 실데이터로 문턱을 넘는다** (D-83)
 > 지난번 A-3 이던 **이름 겹침은 고쳤다** (D-92). 의심하던 곳이 아니라 **경쟁에 순서가 없어서**
 > 였다 — `LabelOptions.rank` 가 전부 0. 이제 눈으로 볼 것만 남아 아래 B 로 내려갔다.
@@ -350,8 +356,9 @@ D-85·D-86·D-87·D-88·D-90 을 실기기(SM-S711N)에서, D-89·D-91 을 에�
 
 #### C. 승인·발급 대기 (개발과 병행)
 
-3. **LOCALDATA 가입 + 인증키** — https://www.localdata.go.kr (공공데이터포털 키는 안 통한다).
-   **2단계 미용시설**에 필요하다. `localdata_cd` 는 문서로 이미 끝냈으므로 급하지 않다
+3. **공공데이터포털 `15154944` 활용신청** — https://www.data.go.kr/data/15154944/openapi.do
+   **자동승인**(개발계정 10,000건/일)이라 대기랄 것이 없다. 2단계를 시작하려면 이것 하나다.
+   · ~~LOCALDATA 가입~~ 은 **없어졌다** — localdata.go.kr 은 2026-04-16 에 닫혔다 (D-93)
 4. **테스터 12명 명단** — 리드타임이 가장 길다 (`plan.md` §3). 개발과 무관하게 지금부터 모은다
 5. **KIPRIS 상표 조회** — 「미리펫」을 제9류(소프트웨어)·제42류(SaaS)로 확인 (D-43).
    스토어 등록 전까지만 하면 된다
@@ -384,9 +391,9 @@ D-85·D-86·D-87·D-88·D-90 을 실기기(SM-S711N)에서, D-89·D-91 을 에�
   주소가 아예 없거나 개편 이전 주소라 카카오도 못 읽는 건이다. 지역 필터에는 안 잡히지만
   좌표가 있으면 반경 검색에는 잡힌다. **시군구 코드로 대충 채우면 안 된다** (D-51)
 
-> ⚠️ **LOCALDATA API 는 변경분만 준다.** 전체 데이터는 API 가 아니라 다운로드 페이지에서
-> 받아야 한다(전체분 매월 2일 배포). 1단계 ETL 은 **최초 1회 전체분 → 이후 API 증분**
-> 2단 구조로 짠다. API 만으로 전국을 긁으려 하면 안 된다.
+> ⚠️ ~~LOCALDATA API 는 변경분만 준다~~ — **죽은 경고다** (D-93). LOCALDATA 사이트가 닫혔고,
+> 공공데이터포털의 인허가 서비스는 **전체분을 쪽수로 준다.** 동물병원 10,617건을 그렇게 받았다
+> (`run.py hospitals`). 2단계도 같은 방식이라 "전체분 → 증분" 2단 구조가 필요 없다.
 
 ### 먼저 밟은 함정 (다시 만나지 않도록)
 

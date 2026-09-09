@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
-"""0단계 · regions.localdata_cd — LOCALDATA 개방자치단체코드 매핑.
+"""0단계 · regions.localdata_cd — 개방자치단체코드 매핑.
 
-LOCALDATA 는 공공데이터포털과 **별도 사이트**이고, 지역코드 목록을 API 가 아니라
-문서로 배포한다. 그래서 이 모듈만 인증키 없이 돈다 — `etl/docs/` 에 커밋된
-엑셀을 읽어 `regions` 에 코드를 채운다.
+지역코드 목록은 API 가 아니라 문서로 배포된다. 그래서 이 모듈만 인증키 없이 돈다 —
+`etl/docs/` 에 커밋된 엑셀을 읽어 `regions` 에 코드를 채운다.
+
+⚠️ **LOCALDATA(localdata.go.kr) 는 2026-04-16 에 닫혔다** (D-93). 인허가 데이터는
+공공데이터포털로 옮겨졌고, 우리가 부르는 API(동물병원 15154952 · 미용업 15154944)는
+처음부터 그쪽이라 **이 매핑은 이미 다 채워져 있고 갱신할 곳도 없다.**
+같은 코드표가 공공데이터포털의 각 서비스 참고문서로도 배포되므로, 다시 돌릴 일이
+생기면 `etl/docs/` 의 엑셀을 그대로 쓴다 — 받아 둔 사본이 유일한 원본이다.
 
 ⚠️ **LOCALDATA 는 행정구역 개편을 아직 반영하지 않았다** (2026-09-05 실측).
 `전남광주통합특별시` 가 없고 `광주광역시`·`전라남도` 가 그대로 있으며,
@@ -71,7 +76,9 @@ def find_document(base_dir: str | None = None) -> str:
     if not hits:
         raise FileNotFoundError(
             f"개방자치단체코드 엑셀을 찾지 못했습니다: {os.path.join(root, DOC_PATTERN)}\n"
-            "  → LOCALDATA(localdata.go.kr) > 이용안내 > 자료받기에서 받아 etl/docs/ 에 둡니다.\n"
+            # ⚠️ 받아 오던 곳(localdata.go.kr)이 없어졌다 (D-93). 저장소의 사본이 원본이다.
+            "  → 저장소에 커밋된 사본입니다. 지웠다면 git 에서 되살리거나,\n"
+            "     공공데이터포털 15154952 · 15154944 의 '참고문서'에서 같은 엑셀을 받습니다.\n"
             "  → 자세한 것은 etl/docs/README.md"
         )
     return hits[0]
