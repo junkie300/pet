@@ -266,8 +266,11 @@ fun MapScreen(
                 RescanState.Working ->
                     RescanButton(working = true, onClick = {}, modifier = Modifier.align(Alignment.CenterHorizontally))
 
+                // 전체 이름이 아니라 **동 이름만** 적는다 (실기기 실측 — D-86). `서울특별시 광진구
+                // 자양동` 은 두 줄로 감겨 지도를 그만큼 가리는데, 어느 시군구인지는 바로 아래
+                // 시트 머리말이 이미 말하고 있다.
                 is RescanState.Switched ->
-                    MapNotice(text = stringResource(R.string.map_rescan_switched, result.region.fullName))
+                    MapNotice(text = stringResource(R.string.map_rescan_switched, result.region.shortName))
 
                 RescanState.NotFound ->
                     MapNotice(text = stringResource(R.string.map_rescan_not_found))
