@@ -225,6 +225,15 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                 MapScreen(
                     viewModel = viewModel,
                     onPlaceClick = { placeId -> navController.navigate("place/$placeId") },
+                    // 지도를 못 여는 기기의 빠져나갈 길 (D-89). 홈 타일과 **같은 곳**으로 보낸다
+                    // (D-80). 목록은 카테고리 하나짜리이므로, 타일로 들어왔으면 그 카테고리로
+                    // 그냥 탭으로 들어왔으면 적재된 것 중 첫째로 연다.
+                    onShowList = {
+                        val category = fromHome
+                            ?: PlaceCategory.loadedEntries.firstOrNull()
+                            ?: PlaceCategory.HOSPITAL
+                        navController.navigate("places/${category.dbValue}")
+                    },
                 )
             }
 

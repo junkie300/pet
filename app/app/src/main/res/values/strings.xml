@@ -39,6 +39,8 @@
     <string name="map_no_key_title">지도 키가 없습니다</string>
     <string name="map_no_key_body">local.properties 에 KAKAO_NATIVE_APP_KEY 를 넣으면 지도가 열립니다.\n다른 화면은 그대로 쓸 수 있습니다.</string>
     <string name="map_loading">장소를 불러오는 중</string>
+    <!-- 지도를 못 여는 기기의 빠져나갈 길 (D-89). 안내만 있으면 그 기기에서는 장소를 볼 방법이 없다 -->
+    <string name="map_show_list">목록으로 보기</string>
     <!-- 카카오맵 SDK 는 ARM 빌드만 배포한다. x86_64 기기·에뮬레이터에서는 지도를 못 연다 (D-71) -->
     <string name="map_unsupported_title">이 기기에서는 지도를 열 수 없습니다</string>
     <string name="map_unsupported_body">카카오맵은 ARM 기기에서만 동작합니다.\n지도 외의 화면은 그대로 쓸 수 있습니다.</string>

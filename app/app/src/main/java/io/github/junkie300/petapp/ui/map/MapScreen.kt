@@ -111,8 +111,15 @@ import kotlinx.coroutines.delay
 fun MapScreen(
     viewModel: PlaceListViewModel,
     onPlaceClick: (Long) -> Unit,
+    /**
+     * 지도를 못 열 때의 빠져나갈 길 (D-89). 이 기기에서는 지도 탭이 안내 한 장이라, 여기가
+     * 없으면 **그 동네 장소를 볼 방법이 아예 없다** — 홈 타일만 목록으로 돌려 둔 것으로는
+     * 지도 탭으로 들어온 사람을 구하지 못한다 (D-80 의 나머지 반쪽).
+     */
+    onShowList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val showList = stringResource(R.string.map_show_list) to onShowList
     // 지도만 안내로 바뀐다. 앱은 그대로 돈다 (spec.md §1.2).
     // 키가 없는 것과 SDK 를 못 올린 것은 **다른 말이다** — 고칠 사람이 볼 곳이 서로 다르다.
     if (!KakaoMapProvider.isConfigured) {
@@ -121,6 +128,7 @@ fun MapScreen(
             title = stringResource(R.string.map_no_key_title),
             body = stringResource(R.string.map_no_key_body),
             modifier = modifier,
+            action = showList,
         )
         return
     }
@@ -131,6 +139,7 @@ fun MapScreen(
             body = stringResource(R.string.map_unsupported_body),
             note = error,
             modifier = modifier,
+            action = showList,
         )
         return
     }
