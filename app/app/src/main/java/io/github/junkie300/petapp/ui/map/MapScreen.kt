@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -71,6 +72,7 @@ import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.label.LabelTextBuilder
+import com.kakao.vectormap.shape.DimScreenCover
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.GeoPoint
 import io.github.junkie300.petapp.data.Place
@@ -555,6 +557,8 @@ private fun MapCanvas(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val density = LocalDensity.current
+    // 지도 바탕을 어둡게 할지 (D-87). 앱 테마와 같은 신호를 본다 — 한쪽만 어두우면 그게 D-74 다.
+    val darkMap = isSystemInDarkTheme()
     val fitPaddingPx = remember(density) { with(density) { FIT_PADDING.roundToPx() } }
     // 라벨을 만드는 곳은 LaunchedEffect 안이라 stringResource 를 부를 수 없다. 틀만 미리 받아 둔다.
     val moreNameFormat = stringResource(R.string.map_name_more)
@@ -678,6 +682,20 @@ private fun MapCanvas(
         )
     }
 
+    // 다크 모드의 지도 바탕 (D-87). 카카오맵에는 **밤 스타일이 없다** — `MapViewInfo.setMapStyle`
+    // 은 카카오 서버에 등록된 스타일만 받고, 공개된 것은 `default` 하나다. 대신 SDK 가 가진
+    // `DimScreenLayer` 로 바탕만 덮는다.
+    //
+    // ⚠️ **`DimScreenCover.Map` 이어야 한다.** `All` 로 덮으면 우리 핀·이름·파란 점까지 같이
+    // 어두워져서, 어둡게 만든 목적(핀이 도드라지는 것)이 사라진다.
+    LaunchedEffect(kakaoMap, darkMap) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        val dim = map.dimScreenManager?.dimScreenLayer ?: return@LaunchedEffect
+        dim.setDimScreenCover(DimScreenCover.Map)
+        dim.setColor(MAP_DIM_COLOR)
+        dim.setVisible(darkMap)
+    }
+
     // 내 위치 점. 장소 핀과 **다른 레이어**에 둔다 — 경쟁에 지면 사라지는 자리에 두면
     // 정작 옮겨 간 뒤에 점이 없다.
     LaunchedEffect(kakaoMap, myLocation) {
@@ -699,7 +717,7 @@ private fun MapCanvas(
 
     // 핀은 지도가 준비된 뒤에만 그릴 수 있다. 묶음이 바뀌면 통째로 다시 그린다 — 한 읍면동은
     // 수십~수백 개라, 지우고 다시 찍는 편이 차이를 계산하는 것보다 싸고 안전하다.
-    LaunchedEffect(kakaoMap, clusters) {
+    LaunchedEffect(kakaoMap, clusters, darkMap) {
         val map = kakaoMap ?: return@LaunchedEffect
         val labels = map.labelManager ?: return@LaunchedEffect
         val pinLayer = labels.layerFor(PIN_LAYER_ID, CompetitionType.None, clickable = true)
@@ -713,10 +731,17 @@ private fun MapCanvas(
         // 스타일은 그림 한 장마다 하나면 된다. 핀 개수만큼 만들면 같은 그림을 수십 벌 올리게 된다.
         val pinStyles = mutableMapOf<PlaceCategory, LabelStyles?>()
         val clusterStyles = mutableMapOf<Pair<PlaceCategory, Int>, LabelStyles?>()
+        // 글자와 테두리를 **바탕에 맞춰 뒤집는다.** 어두워진 바탕 위의 검은 글자는 흰 테두리가
+        // 있어도 읽기 어렵다 — 밝은 글자에 어두운 테두리가 같은 일을 반대로 한다.
         val nameStyles = labels.addLabelStyles(
             LabelStyles.from(
                 LabelStyle.from(spacerBitmap(context))
-                    .setTextStyles(PIN_TEXT_SIZE, PIN_TEXT_COLOR, PIN_TEXT_STROKE, PIN_TEXT_STROKE_COLOR),
+                    .setTextStyles(
+                        PIN_TEXT_SIZE,
+                        if (darkMap) PIN_TEXT_COLOR_DARK else PIN_TEXT_COLOR,
+                        PIN_TEXT_STROKE,
+                        if (darkMap) PIN_TEXT_STROKE_COLOR_DARK else PIN_TEXT_STROKE_COLOR,
+                    ),
             ),
         )
 
@@ -949,7 +974,17 @@ private const val MY_LOCATION_RING_COLOR = 0xFFFFFFFF.toInt()
  */
 private const val RESCAN_NOTICE_MS = 3_500L
 
+/**
+ * 다크 모드에서 지도 바탕을 덮는 색 (D-87). 앱의 어두운 배경(`SurfaceDark`)에 알파를 얹은 값이다.
+ *
+ * ⚠️ **완전히 덮지 않는다.** 도로·지명이 비쳐 보여야 지도가 지도 노릇을 한다 — 어둡게 만드는
+ * 목적은 시트와 톤을 맞추는 것이지 바탕을 지우는 것이 아니다.
+ */
+private const val MAP_DIM_COLOR = 0x9914181A.toInt()
+
 private const val PIN_TEXT_SIZE = 26
 private const val PIN_TEXT_COLOR = 0xFF1A1A1A.toInt()
 private const val PIN_TEXT_STROKE = 3
 private const val PIN_TEXT_STROKE_COLOR = 0xFFFFFFFF.toInt()
+private const val PIN_TEXT_COLOR_DARK = 0xFFF2F4F3.toInt()
+private const val PIN_TEXT_STROKE_COLOR_DARK = 0xFF14181A.toInt()
