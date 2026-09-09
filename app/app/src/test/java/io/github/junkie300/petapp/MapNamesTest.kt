@@ -5,6 +5,7 @@ import io.github.junkie300.petapp.ui.map.MapCluster
 import io.github.junkie300.petapp.ui.map.MapPin
 import io.github.junkie300.petapp.ui.map.mapNames
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -74,5 +75,29 @@ class MapNamesTest {
     @Test
     fun `핀이 없으면 이름도 없다`() {
         assertEquals(0, mapNames(emptyList()).size)
+    }
+
+    /**
+     * 겹쳤을 때 **누가 남는가** (D-92).
+     *
+     * 순위가 없으면(전부 0) SDK 의 겹침 경쟁이 아무도 떨어뜨리지 않는다 — 자양동에서 좌표가
+     * 다른 세 이름이 겹쳐 찍히던 것이 그 때문이다. 순서는 **같은 자리에서 대표를 고르는 규칙과
+     * 같다**(목록의 이름순, D-85).
+     */
+    @Test
+    fun `앞선 이름이 더 높은 순위를 갖는다`() {
+        val names = mapNames(
+            singles(
+                pin(1, "로얄동물병원", 37.5340, 127.0700),
+                pin(2, "자양동물병원", 37.5341, 127.0701),
+                pin(3, "해맑은동물병원", 37.5342, 127.0702),
+            ),
+        )
+        assertEquals(listOf("로얄동물병원", "자양동물병원", "해맑은동물병원"), names.map { it.name })
+        val ranks = names.map { it.rank }
+        assertEquals(ranks.sortedDescending(), ranks)
+        // 우열이 없으면 경쟁이 갈라 주지 못한다 — 같은 값이 둘 있으면 안 된다.
+        assertEquals(ranks.size, ranks.toSet().size)
+        assertTrue("순위는 0 보다 커야 한다 (0 은 손대지 않은 기본값이다)", ranks.all { it > 0 })
     }
 }

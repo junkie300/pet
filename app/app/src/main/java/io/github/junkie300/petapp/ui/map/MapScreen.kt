@@ -72,6 +72,7 @@ import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.label.LabelTextBuilder
+import com.kakao.vectormap.label.OrderingType
 import com.kakao.vectormap.shape.DimScreenCover
 import io.github.junkie300.petapp.R
 import io.github.junkie300.petapp.data.GeoPoint
@@ -794,6 +795,9 @@ private fun MapCanvas(
             LabelOptions.from(LatLng.from(name.latitude, name.longitude))
                 .setStyles(nameStyles)
                 .setTexts(LabelTextBuilder().setTexts(text))
+                // ⚠️ **이것이 없으면 경쟁이 아무도 떨어뜨리지 않는다** (D-92). 레이어는
+                // `OrderingType.Rank` 로 줄을 세우는데 rank 는 기본이 전부 0 이다.
+                .setRank(name.rank)
                 .setClickable(false)
         }
 
@@ -831,6 +835,10 @@ private fun pinColor(category: PlaceCategory) = when (category) {
  * 사라진다. 지도에서 장소가 통째로 없어지는 것과 이름 하나가 생략되는 것은 전혀 다른 일이다.
  * - 그림 레이어: 경쟁 없음. 좌표가 있는 장소는 **반드시 점 하나로 보인다**
  * - 이름 레이어: 경쟁 켬. 자리가 없으면 이름만 빠진다 (D-73 의 "이름이 서로 겹친다")
+ *
+ * ⚠️ **경쟁을 켜는 것만으로는 아무 일도 안 일어난다** (D-92). 줄 세우는 기준이
+ * [OrderingType.Rank] 인데 `LabelOptions.rank` 를 아무도 안 주면 전부 0 이라 우열이 없다 —
+ * 순서는 [MapName.rank] 가 준다. 기본값이지만 **적어 둔다.** 이 한 줄이 없어서 겹쳤다.
  */
 private fun LabelManager.layerFor(
     layerId: String,
@@ -843,6 +851,7 @@ private fun LabelManager.layerFor(
             LabelLayerOptions.from(layerId)
                 .setCompetitionType(competitionType)
                 .setCompetitionUnit(CompetitionUnit.IconAndText)
+                .setOrderingType(OrderingType.Rank)
                 .setClickable(clickable),
         )
 
