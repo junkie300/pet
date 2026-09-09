@@ -242,7 +242,7 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
 
             composable(ROUTE_FAVORITES) {
                 val viewModel: FavoritesViewModel = viewModel(
-                    factory = FavoritesViewModel.factory(container.favoriteDao),
+                    factory = FavoritesViewModel.factory(container.favoriteDao, container.deviceLocation),
                 )
                 FavoritesScreen(
                     viewModel = viewModel,
