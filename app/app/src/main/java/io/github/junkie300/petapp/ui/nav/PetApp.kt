@@ -140,6 +140,7 @@ fun PetApp(container: AppContainer, modifier: Modifier = Modifier) {
                     factory = RegionPickerViewModel.factory(
                         container.regionRepository,
                         container.recentRegionStore,
+                        container.deviceLocation,
                     ),
                 )
                 RegionPickerScreen(

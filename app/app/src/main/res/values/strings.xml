@@ -132,6 +132,10 @@
     <string name="region_picker_lead">어느 동네를 미리 볼까요?</string>
     <string name="region_step_hint">시도 → 시군구 → 읍면동 순으로 고릅니다</string>
     <string name="region_selected_none">지역을 고르면 여기에 표시됩니다</string>
+    <string name="region_here">현재 위치로</string>
+    <string name="region_here_denied">위치 권한이 없어 현재 위치로 갈 수 없습니다. 아래에서 골라 주세요</string>
+    <string name="region_here_failed">현재 위치를 찾지 못했습니다. 실내에서는 잘 안 잡힙니다</string>
+    <string name="region_here_not_found">현재 위치 근처에서 지역을 찾지 못했습니다</string>
     <string name="cd_search">검색</string>
     <string name="cd_location">선택한 지역</string>
 

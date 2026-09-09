@@ -17,10 +17,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -31,13 +33,16 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +59,7 @@ import io.github.junkie300.petapp.ui.common.FailedMessage
 import io.github.junkie300.petapp.ui.common.OfflineBanner
 import io.github.junkie300.petapp.ui.common.SkeletonRows
 import io.github.junkie300.petapp.ui.common.UiState
+import io.github.junkie300.petapp.ui.common.rememberLocationPermissionRequest
 import io.github.junkie300.petapp.ui.theme.CardShape
 import io.github.junkie300.petapp.ui.theme.PillShape
 import io.github.junkie300.petapp.ui.theme.Spacing
@@ -62,7 +68,9 @@ import io.github.junkie300.petapp.ui.theme.Spacing
  * S-01 지역 선택 (spec.md §5.2).
  *
  * 시도 → 시군구 → 읍면동 3단. 각 단계는 상위가 정해져야 열린다.
- * "현재 위치로" 버튼은 카카오맵 SDK·위치 권한이 붙는 시점에 추가한다.
+ * 「현재 위치로」는 검색창 아래에 둔다 — 손으로 고르는 길(검색·최근·3단)과 **나란히 있는 또 하나의
+ * 길**이지 그 위에 있는 것이 아니다. 권한을 거절해도 나머지 길은 그대로 열려 있어야 한다
+ * (`spec.md §5.2` 가 못박은 것).
  *
  * 형태는 시안(이태우_디자인시안)을 따른다 — 웜 크림 배경 위에 흰 카드, 알약 검색창,
  * 딥그린 주요 버튼 (D-47). 시안이 약속하던 별점·사진은 넣지 않는다 (D-40).
@@ -74,6 +82,24 @@ fun RegionPickerScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // 권한 거절은 조회를 시작하지도 못하므로 ViewModel 이 모른다 — 창의 답을 여기서 받는다.
+    // 화면이 다시 그려져도 남아 있어야 한다: 두 번째 누름부터는 시스템이 창을 안 띄울 수 있고,
+    // 그때 이유가 사라지면 버튼이 고장 난 것으로 읽힌다 (DistanceRow 와 같은 판단).
+    var denied by rememberSaveable { mutableStateOf(false) }
+    val askLocationPermission = rememberLocationPermissionRequest { granted ->
+        denied = !granted
+        if (granted) viewModel.goToCurrentLocation()
+    }
+
+    // 찾았으면 고른 것과 똑같이 나간다. 저장은 ViewModel 이 나가기 전에 이미 끝냈다.
+    LaunchedEffect(state.here) {
+        val here = state.here
+        if (here is HereState.Found) {
+            viewModel.clearHere()
+            onRegionConfirmed(here.region)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -93,6 +119,28 @@ fun RegionPickerScreen(
             keyword = state.searchKeyword,
             onKeywordChange = viewModel::updateSearchKeyword,
         )
+
+        HereButton(
+            working = state.here == HereState.Working,
+            onClick = {
+                denied = false
+                // 이미 허용돼 있으면 묻지 않는다 (D-82 와 같다) — `대략` 만 허용한 사람이
+                // 누를 때마다 같은 창을 다시 보면, 정확한 위치를 안 준 것이 잘못처럼 읽힌다.
+                if (viewModel.hasLocationPermission) {
+                    viewModel.goToCurrentLocation()
+                } else {
+                    askLocationPermission()
+                }
+            },
+        )
+
+        hereNotice(state.here, denied)?.let { message ->
+            Text(
+                text = stringResource(message),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         state.searchResult?.let { result ->
             SearchResults(
@@ -215,6 +263,59 @@ private fun SearchField(
             .fillMaxWidth()
             .height(56.dp),
     )
+}
+
+/**
+ * 「현재 위치로」 (`spec.md §5.2` S-01).
+ *
+ * ⚠️ **주요 버튼(딥그린)으로 두지 않는다.** 아래의 `이 지역으로 보기` 가 이 화면의 결론이고,
+ * 이건 거기까지 가는 지름길 하나다. 둘 다 채워진 버튼이면 무엇을 눌러야 하는지 흐려진다.
+ *
+ * 누르고 나서 최대 8초까지 걸린다 (D-81 의 제공자별 대기) — 그동안 표시가 없으면 안 눌린 줄
+ * 알고 계속 누르게 되므로 아이콘 자리가 돈다 (지도의 그것과 같다 · D-82).
+ */
+@Composable
+private fun HereButton(
+    working: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !working,
+        shape = PillShape,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp), // 최소 터치 타겟 48dp (spec.md §6.5)
+    ) {
+        if (working) {
+            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.MyLocation,
+                contentDescription = null, // 바로 옆 글자가 같은 말을 한다
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            text = stringResource(R.string.region_here),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+}
+
+/**
+ * 못 갔으면 **왜 못 갔는지**를 한 줄로 (D-82). 아무 일도 안 일어나는 버튼은 고장으로 읽힌다.
+ *
+ * 셋을 갈라 적는다 — 권한이 없는 것 · 위치를 못 잡은 것 · 근처에 지역이 없는 것은 사용자가
+ * 할 일이 각각 다르다 (`spec.md §5.3`).
+ */
+private fun hereNotice(here: HereState, denied: Boolean): Int? = when {
+    here is HereState.Failed -> R.string.region_here_failed
+    here is HereState.NotFound -> R.string.region_here_not_found
+    denied -> R.string.region_here_denied
+    else -> null
 }
 
 @Composable
