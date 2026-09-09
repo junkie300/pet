@@ -29,8 +29,16 @@ data class Region(
             else -> dongName ?: fullName
         }
 
-    /** 중심좌표가 아직 채워지지 않은 지역이 있다 (0단계 잔여분). 지도 초기 위치에 쓴다. */
-    val hasCenter: Boolean get() = centerLat != null && centerLng != null
+    /**
+     * 중심좌표. 지도 초기 위치와 「이 지역에서 다시 검색」의 기준점이다 (D-86).
+     *
+     * **null 일 수 있다** — 중심좌표가 아직 채워지지 않은 지역이 남아 있다 (0단계 잔여분).
+     */
+    val center: GeoPoint? get() {
+        val lat = centerLat ?: return null
+        val lng = centerLng ?: return null
+        return GeoPoint(lat, lng)
+    }
 
     companion object {
         const val LEVEL_SIDO = 1
@@ -38,3 +46,14 @@ data class Region(
         const val LEVEL_DONG = 3
     }
 }
+
+/**
+ * [point] 에 가장 가까운 지역. 중심좌표가 없는 지역은 잴 수 없으므로 셈에서 빠진다.
+ *
+ * ⚠️ **"가장 가까운 중심"이지 "그 점을 품는 지역"이 아니다.** 경계 다각형이 없으므로 (D-86)
+ * 여기가 우리가 답할 수 있는 최선이다 — 동네 경계 근처에서는 옆 동이 나올 수 있다.
+ */
+fun List<Region>.nearestTo(point: GeoPoint): Region? = minByOrNull { region ->
+    val center = region.center ?: return@minByOrNull Double.MAX_VALUE
+    distanceMeters(point, center.latitude, center.longitude)
+}?.takeIf { it.center != null }

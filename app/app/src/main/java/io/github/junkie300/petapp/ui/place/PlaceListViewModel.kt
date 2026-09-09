@@ -49,6 +49,23 @@ sealed interface PlaceListUiState {
     ) : PlaceListUiState
 }
 
+/**
+ * 「이 지역에서 다시 검색」의 결말 (D-86).
+ *
+ * 누른 뒤에 아무 표시가 없으면 안 눌린 줄 안다 — 조회는 網을 한 번 다녀오는 일이므로
+ * [Working] 이 필요하고, 못 찾은 것([NotFound])과 갈아탄 것([Switched])도 서로 다른 말이다.
+ */
+sealed interface RescanState {
+    data object Idle : RescanState
+    data object Working : RescanState
+
+    /** 갈아탄 지역. 화면이 이름을 한 줄로 알린다. */
+    data class Switched(val region: Region) : RescanState
+
+    /** 가까운 읍면동이 없다 — 바다 위이거나, 오프라인이라 받아 둔 지역이 그 근처에 없다. */
+    data object NotFound : RescanState
+}
+
 /** 위치를 잡는 일의 결말. 자세한 것은 [PlaceListViewModel.locate] 에 적어 두었다. */
 enum class LocateState { IDLE, WORKING, FAILED }
 
@@ -63,7 +80,7 @@ class PlaceListViewModel(
     private val regions: RegionRepository,
     private val places: PlaceRepository,
     private val deviceLocation: DeviceLocation,
-    recentStore: RecentRegionStore,
+    private val recentStore: RecentRegionStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<PlaceListUiState>(PlaceListUiState.Loading)
@@ -91,6 +108,10 @@ class PlaceListViewModel(
      */
     private val _locate = MutableStateFlow(LocateState.IDLE)
     val locate: StateFlow<LocateState> = _locate.asStateFlow()
+
+    /** 「이 지역에서 다시 검색」이 어떻게 됐는지 (D-86). */
+    private val _rescan = MutableStateFlow<RescanState>(RescanState.Idle)
+    val rescan: StateFlow<RescanState> = _rescan.asStateFlow()
 
     /** 지금 위치 권한이 있는가. 버튼이 **물어볼지 바로 잡을지**를 이걸로 정한다. */
     val hasLocationPermission: Boolean get() = deviceLocation.hasPermission
@@ -153,6 +174,38 @@ class PlaceListViewModel(
             if (point != null) _origin.value = point
             _locate.value = if (point == null) LocateState.FAILED else LocateState.IDLE
         }
+    }
+
+    /**
+     * 지금 지도가 보고 있는 자리로 **지역을 갈아탄다** (「이 지역에서 다시 검색」 · D-86).
+     *
+     * 좌표로 장소를 조회하지 않는다. 이 앱의 모든 화면(홈 건수·목록·상세·오프라인 사본·즐겨찾기)이
+     * **읍면동 코드** 위에 서 있으므로, 좌표 조회를 새로 들이면 지역이라는 기준점이 화면마다
+     * 달라진다 (D-24·D-59). 대신 **가장 가까운 읍면동을 찾아 그 지역을 고른 것으로 바꾼다** —
+     * 그러면 그다음은 사용자가 S-01 에서 고른 것과 완전히 같은 길을 지난다.
+     *
+     * ⚠️ 고른 지역은 앱 전체의 현재 지역이다 (D-54). 홈도 목록도 함께 옮겨 간다 — 지도에서만
+     * 다른 동네를 보고 있으면 탭을 옮길 때마다 어느 쪽이 맞는지 알 수 없게 된다.
+     */
+    fun searchHere(center: GeoPoint) {
+        if (_rescan.value == RescanState.Working) return
+        viewModelScope.launch {
+            _rescan.value = RescanState.Working
+            // 조회가 깨지는 것과 근처에 없는 것을 갈라 적지 않는다 — 사용자가 할 수 있는 일이
+            // "지도를 옮겨 다시 눌러 본다"로 같기 때문이다.
+            val found = runCatching { regions.nearestDong(center).data }.getOrNull()
+            _rescan.value = if (found == null) {
+                RescanState.NotFound
+            } else {
+                recentStore.remember(found.code)
+                RescanState.Switched(found)
+            }
+        }
+    }
+
+    /** 알림 한 줄을 거둔다. 도는 중에는 건드리지 않는다. */
+    fun clearRescanNotice() {
+        if (_rescan.value != RescanState.Working) _rescan.value = RescanState.Idle
     }
 
     /**

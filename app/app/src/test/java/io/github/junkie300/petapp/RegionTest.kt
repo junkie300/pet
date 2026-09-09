@@ -46,8 +46,8 @@ class RegionTest {
 
     @Test
     fun `중심좌표는 둘 다 있어야 있는 것으로 본다`() {
-        assertFalse(region("4113110300", 3).hasCenter)
-        assertFalse(region("4113110300", 3, lat = 37.44).hasCenter)
-        assertTrue(region("4113110300", 3, lat = 37.44, lng = 127.13).hasCenter)
+        assertFalse(region("4113110300", 3).center != null)
+        assertFalse(region("4113110300", 3, lat = 37.44).center != null)
+        assertTrue(region("4113110300", 3, lat = 37.44, lng = 127.13).center != null)
     }
 }

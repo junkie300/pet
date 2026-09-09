@@ -30,6 +30,27 @@ abstract class CacheDao {
     @Query("SELECT * FROM cached_regions WHERE parent_code = :parentCode ORDER BY full_name")
     abstract suspend fun regionChildren(parentCode: String): List<CachedRegion>
 
+    /**
+     * 좌표 상자 안의 지역 (「이 지역에서 다시 검색」 — D-86).
+     *
+     * 가장 가까운 하나를 고르는 것은 부르는 쪽이다. SQL 로 거리를 재려면 삼각함수를 써야 하는데,
+     * 상자가 이미 작아서 몇 개 안 나온다 — 코틀린에서 하버사인으로 재는 편이 정확하고 짧다.
+     *
+     * ⚠️ 오프라인이면 **이미 받아 둔 지역** 안에서만 찾는다. 전국 5,067개가 다 들어 있지 않으므로
+     * 엉뚱하게 먼 동네가 나올 수 있고, 그래서 화면이 오프라인 배너를 함께 띄운다.
+     */
+    @Query(
+        "SELECT * FROM cached_regions WHERE level = :level " +
+            "AND center_lat BETWEEN :minLat AND :maxLat AND center_lng BETWEEN :minLng AND :maxLng",
+    )
+    abstract suspend fun regionsInBox(
+        level: Int,
+        minLat: Double,
+        maxLat: Double,
+        minLng: Double,
+        maxLng: Double,
+    ): List<CachedRegion>
+
     /** 오프라인 검색은 **이미 받아 둔 읍면동** 안에서만 찾는다. 전국이 다 들어 있지 않다. */
     @Query(
         "SELECT * FROM cached_regions WHERE level = :level AND full_name LIKE '%' || :keyword || '%' " +

@@ -61,6 +61,14 @@
     <string name="cd_my_location">현재 위치로</string>
     <string name="map_locate_denied">위치 권한이 없어 현재 위치로 갈 수 없습니다</string>
     <string name="map_locate_failed">현재 위치를 찾지 못했습니다. 실내에서는 잘 안 잡힙니다</string>
+    <!-- 「이 지역에서 다시 검색」 (spec.md §5.2 · D-86). 경계 다각형이 없어 "지역 밖"을 물을 수
+         없으므로, 고른 지역 중심에서 3km 넘게 멀어지면 뜬다. 누르면 가장 가까운 읍면동으로 갈아탄다 -->
+    <string name="map_rescan">이 지역에서 다시 검색</string>
+    <!-- 조사(으로/로)가 이름마다 갈리므로 "기준으로"를 붙인다 — 필동2가·삼성동이 같은 문장을 쓴다 -->
+    <string name="map_rescan_switched">%1$s 기준으로 바꿨습니다</string>
+    <string name="map_rescan_not_found">이 근처에서 지역을 찾지 못했습니다</string>
+    <!-- 좌표가 똑같은 장소가 둘 이상일 때. 이름은 하나만 그리되 나머지가 있다는 것은 밝힌다 (D-85) -->
+    <string name="map_name_more">%1$s 외 %2$d</string>
     <!-- 바텀시트 손잡이. 끌어서 3단(peek·half·full), 눌러도 다음 단으로 간다 -->
     <string name="cd_sheet_handle">목록 펼치기</string>
 

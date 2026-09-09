@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -86,12 +88,14 @@ import io.github.junkie300.petapp.ui.place.DistanceRow
 import io.github.junkie300.petapp.ui.place.LocateState
 import io.github.junkie300.petapp.ui.place.PlaceListUiState
 import io.github.junkie300.petapp.ui.place.PlaceListViewModel
+import io.github.junkie300.petapp.ui.place.RescanState
 import io.github.junkie300.petapp.ui.place.placeItems
 import io.github.junkie300.petapp.ui.theme.CategoryColor
 import io.github.junkie300.petapp.ui.theme.PillShape
 import io.github.junkie300.petapp.ui.theme.Spacing
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /**
  * S-02 장소 지도 — 고른 읍면동의 장소를 핀으로 찍는다 (spec.md §5.2).
@@ -133,16 +137,20 @@ fun MapScreen(
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val origin by viewModel.origin.collectAsStateWithLifecycle()
     val locate by viewModel.locate.collectAsStateWithLifecycle()
+    val rescan by viewModel.rescan.collectAsStateWithLifecycle()
     val ready = state as? PlaceListUiState.Ready
 
     val places = ((ready?.places as? UiState.Success)?.data).orEmpty()
     val pins = remember(places, selected) { places.toPins(selected.first()) }
     val region = ready?.region
-    val regionCenter = remember(region) {
-        val lat = region?.centerLat
-        val lng = region?.centerLng
-        if (lat != null && lng != null) LatLng.from(lat, lng) else null
+    val regionPoint = region?.center
+    val regionCenter = remember(regionPoint) {
+        regionPoint?.let { LatLng.from(it.latitude, it.longitude) }
     }
+
+    // 지도 한가운데. 「이 지역에서 다시 검색」은 이것과 고른 지역 중심의 거리로 뜬다 (D-86).
+    var mapCenter by remember { mutableStateOf<GeoPoint?>(null) }
+    val offerRescan = MapRescan.shouldOffer(regionPoint, mapCenter)
 
     // 지도가 검게 뜨는 사고는 예외도 로그도 분명하지 않다 (D-69). 받은 메시지를 화면에 그대로 적는다.
     var mapError by remember { mutableStateOf<String?>(null) }
@@ -190,6 +198,15 @@ fun MapScreen(
         }
     }
 
+    // 확인 문구는 잠깐이면 된다. 갈아탄 지역 이름은 그 뒤로도 시트 머리말이 계속 말하고,
+    // 지도 위에 계속 붙어 있으면 그만큼 지도를 가린다.
+    LaunchedEffect(rescan) {
+        if (rescan is RescanState.Switched || rescan is RescanState.NotFound) {
+            delay(RESCAN_NOTICE_MS)
+            viewModel.clearRescanNotice()
+        }
+    }
+
     val sheetState = rememberPlaceSheetState()
     val listState = rememberLazyListState()
 
@@ -221,6 +238,7 @@ fun MapScreen(
             topInsetPx = noticeHeightPx,
             bottomInsetPx = sheetInsetPx,
             onPinClick = { placeId -> selectedPlaceId = placeId },
+            onCameraSettled = { mapCenter = it },
             onMapError = { mapError = it.message ?: it.javaClass.simpleName },
             modifier = Modifier.fillMaxSize(),
         )
@@ -241,6 +259,27 @@ fun MapScreen(
                 MapNotice(text = stringResource(R.string.map_error, error), emphasis = true)
             }
             locateNotice?.let { MapNotice(text = stringResource(it)) }
+
+            // 「이 지역에서 다시 검색」 (D-86). 버튼과 그 결과는 **같은 자리**를 쓴다 —
+            // 누른 자리에서 답이 나오지 않으면 무엇에 대한 답인지 이어 읽히지 않는다.
+            when (val result = rescan) {
+                RescanState.Working ->
+                    RescanButton(working = true, onClick = {}, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+                is RescanState.Switched ->
+                    MapNotice(text = stringResource(R.string.map_rescan_switched, result.region.fullName))
+
+                RescanState.NotFound ->
+                    MapNotice(text = stringResource(R.string.map_rescan_not_found))
+
+                RescanState.Idle -> if (offerRescan) {
+                    RescanButton(
+                        working = false,
+                        onClick = { mapCenter?.let(viewModel::searchHere) },
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
+            }
         }
 
         // 시트 위에 뜬다. 시트를 올리면 그 뒤로 숨는데, 그때는 목록이 주인공이라 괜찮다.
@@ -386,6 +425,53 @@ private fun MapNotice(content: @Composable () -> Unit) {
 }
 
 /**
+ * 「이 지역에서 다시 검색」 (spec.md §5.2 · D-86).
+ *
+ * 지도 위에 얹는 유일한 **누를 것**이라 알림 줄과 같은 알약 판을 쓰되, 글자만 두지 않고 아이콘을
+ * 함께 넣는다 — 알림과 버튼이 같은 모양이면 눌러야 하는 것을 지나친다.
+ *
+ * ⚠️ 누르면 網을 한 번 다녀온다. 그동안 표시가 없으면 계속 누르게 되므로 아이콘 자리가 돈다
+ * (`현재 위치로` 와 같은 이유 — D-82).
+ */
+@Composable
+private fun RescanButton(
+    working: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = !working,
+        shape = PillShape,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shadowElevation = 2.dp,
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            if (working) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.map_rescan),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+/**
  * `현재 위치로` (spec.md §5.2 · D-82).
  *
  * ⚠️ **누르고 나서 8초까지 기다릴 수 있다** (D-81 의 제공자별 대기). 그동안 버튼이 그대로면
@@ -458,6 +544,8 @@ private fun MapCanvas(
     /** 바텀시트에 가려지는 높이(px). 같은 이유로 아래쪽도 빼 준다. */
     bottomInsetPx: Int,
     onPinClick: (Long) -> Unit,
+    /** 카메라가 멈출 때마다 지도 한가운데. 「이 지역에서 다시 검색」이 이걸로 거리를 잰다 (D-86). */
+    onCameraSettled: (GeoPoint) -> Unit,
     onMapError: (Exception) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -465,9 +553,12 @@ private fun MapCanvas(
     val lifecycleOwner = LocalLifecycleOwner.current
     val density = LocalDensity.current
     val fitPaddingPx = remember(density) { with(density) { FIT_PADDING.roundToPx() } }
+    // 라벨을 만드는 곳은 LaunchedEffect 안이라 stringResource 를 부를 수 없다. 틀만 미리 받아 둔다.
+    val moreNameFormat = stringResource(R.string.map_name_more)
 
     // 콜백은 지도를 시작할 때 한 번만 등록된다. 그 안에서 최신 람다·값을 보게 해 둔다.
     val currentPinClick by rememberUpdatedState(onPinClick)
+    val currentCameraSettled by rememberUpdatedState(onCameraSettled)
     val currentMapError by rememberUpdatedState(onMapError)
     val currentCenter by rememberUpdatedState(center)
 
@@ -511,7 +602,12 @@ private fun MapCanvas(
                                 else -> false
                             }
                         }
-                        map.setOnCameraMoveEndListener { _, position, _ -> zoomLevel = position.zoomLevel }
+                        map.setOnCameraMoveEndListener { _, position, _ ->
+                            zoomLevel = position.zoomLevel
+                            currentCameraSettled(
+                                GeoPoint(position.position.latitude, position.position.longitude),
+                            )
+                        }
                         zoomLevel = map.zoomLevel
                         kakaoMap = map
                     }
@@ -622,7 +718,6 @@ private fun MapCanvas(
         )
 
         val pinOptions = mutableListOf<LabelOptions>()
-        val nameOptions = mutableListOf<LabelOptions>()
         for (cluster in clusters) {
             val position = LatLng.from(cluster.latitude, cluster.longitude)
             val single = cluster.single
@@ -649,11 +744,20 @@ private fun MapCanvas(
                     .setClickable(true)
                     // 핀을 눌렀을 때 어느 장소인지 되찾는 유일한 끈이다.
                     .setTag(single.placeId)
-                nameOptions += LabelOptions.from(position)
-                    .setStyles(nameStyles)
-                    .setTexts(LabelTextBuilder().setTexts(single.name))
-                    .setClickable(false)
             }
+        }
+
+        // 이름은 핀과 따로 만든다 — **같은 좌표는 하나만** 그려야 하기 때문이다 (D-85).
+        val nameOptions = mapNames(clusters).map { name ->
+            val text = if (name.hiddenCount > 0) {
+                moreNameFormat.format(name.name, name.hiddenCount)
+            } else {
+                name.name
+            }
+            LabelOptions.from(LatLng.from(name.latitude, name.longitude))
+                .setStyles(nameStyles)
+                .setTexts(LabelTextBuilder().setTexts(text))
+                .setClickable(false)
         }
 
         pinLayer.addLabels(pinOptions)
@@ -834,6 +938,13 @@ private const val MY_LOCATION_RING_DP = 3f
 /** 지도앱의 관용 파랑. 카테고리 5색과 겹치지 않는 값이어야 한다. */
 private const val MY_LOCATION_COLOR = 0xFF1A73E8.toInt()
 private const val MY_LOCATION_RING_COLOR = 0xFFFFFFFF.toInt()
+
+/**
+ * 「이 지역에서 다시 검색」 뒤에 붙는 확인 문구가 머무는 시간(ms).
+ *
+ * 한 줄을 읽을 만큼이면 된다. 갈아탄 지역 이름은 그 뒤로도 시트 머리말에 계속 적혀 있다.
+ */
+private const val RESCAN_NOTICE_MS = 3_500L
 
 private const val PIN_TEXT_SIZE = 26
 private const val PIN_TEXT_COLOR = 0xFF1A1A1A.toInt()

@@ -78,6 +78,51 @@ class RegionRepository(private val client: SupabaseClient, private val cache: Ca
         }
     }
 
+    /**
+     * [from] 에 **가장 가까운 읍면동** (「이 지역에서 다시 검색」 — D-86).
+     *
+     * 경계 다각형이 없으므로 "이 좌표를 품는 동"은 물을 수 없다. 좌표 상자로 후보를 받아 와서
+     * 하버사인으로 가장 가까운 하나를 고른다 ([nearestTo]).
+     *
+     * 상자를 두 번 던진다 — 가까운 것부터 찾고, 비면 넓혀서 한 번 더. 바다 위나 산속에서
+     * 눌렀을 때 "못 찾았습니다"로 끝내는 것보다 먼 동네라도 답하는 편이 낫다.
+     * (넓힌 상자는 서울처럼 조밀한 곳에서 수백 행이 오므로, 처음부터 쓰지는 않는다.)
+     *
+     * 못 찾으면 데이터가 null 이다 — **예외가 아니다.** 부르는 쪽이 "찾지 못했다"를 화면에
+     * 적어야 하고, 그건 조회 실패와 다른 말이다.
+     */
+    suspend fun nearestDong(from: GeoPoint): Fetched<Region?> {
+        var last: Fetched<List<Region>>? = null
+        for (span in SEARCH_SPANS) {
+            val found = dongsAround(from, span)
+            last = found
+            found.data.nearestTo(from)?.let { nearest -> return found.map { nearest } }
+        }
+        return (last ?: Fetched(emptyList())).map { null }
+    }
+
+    /** [from] 을 한가운데 둔 [span] 도짜리 정사각 상자 안의 읍면동. */
+    private suspend fun dongsAround(from: GeoPoint, span: Double): Fetched<List<Region>> {
+        val minLat = from.latitude - span
+        val maxLat = from.latitude + span
+        val minLng = from.longitude - span
+        val maxLng = from.longitude + span
+        return fetchRegions(
+            remote = {
+                query {
+                    filter {
+                        eq("level", Region.LEVEL_DONG)
+                        gte("center_lat", minLat)
+                        lte("center_lat", maxLat)
+                        gte("center_lng", minLng)
+                        lte("center_lng", maxLng)
+                    }
+                }
+            },
+            cached = { cache.regionsInBox(Region.LEVEL_DONG, minLat, maxLat, minLng, maxLng) },
+        )
+    }
+
     private suspend fun fetchRegions(
         remote: suspend () -> List<Region>,
         cached: suspend () -> List<CachedRegion>,
@@ -115,6 +160,15 @@ class RegionRepository(private val client: SupabaseClient, private val cache: Ca
         private const val TABLE = "regions"
         const val MIN_SEARCH_LENGTH = 2
         const val SEARCH_LIMIT = 20
+
+        /**
+         * 최근접 읍면동을 찾을 때 훑을 상자의 반변(도).
+         *
+         * 위도 0.05도는 약 5.6km, 경도 0.05도는 우리 위도에서 약 4.4km 다 — 버튼이 뜨는
+         * 3km(`MapRescan.TRIGGER_METERS`)보다 넉넉하다. 그래도 비면 0.5도(약 45~55km)로
+         * 넓힌다. 상자는 후보를 줄이는 그물일 뿐, 거리는 하버사인이 다시 잰다.
+         */
+        private val SEARCH_SPANS = listOf(0.05, 0.5)
 
         /** 앱이 실제로 쓰는 컬럼만. 외부 코드 컬럼은 받지 않는다. */
         const val COLUMNS =
