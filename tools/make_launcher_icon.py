@@ -72,13 +72,19 @@ def layer(content, size=432, safe_ratio=66/108):
     return canvas
 
 def mono(content):
-    """단색 레이어: 실루엣을 검정 + 알파로. 발바닥·화살표는 구멍으로 남는다."""
+    """단색 레이어: 실루엣을 검정 + 알파로. 발바닥·화살표는 구멍으로 남는다.
+
+    ⚠️ **문턱은 크림(240)과 주황 뱃지(168) 사이가 아니라 크림 바로 아래여야 한다** (D-90).
+    150~210 으로 잡으면 뱃지가 알파 0.7 로 남아, 테마 아이콘에서 **흐릿한 얼룩**으로 보인다
+    (실기기 실측). 단색 레이어는 색이 없고 알파만 있으므로 반투명은 그냥 때처럼 읽힌다.
+    뱃지를 핀 몸통과 같은 불투명으로 합치면 **화살표 구멍만** 남아 또렷해진다.
+    """
     import numpy as np
     a = np.asarray(content).astype(np.float32)
     rgb, alpha = a[..., :3], a[..., 3]
-    # 크림(밝은) 픽셀은 뚫는다
+    # 크림(밝은) 픽셀만 뚫는다. 폭 30 은 가장자리 안티에일리어싱을 살리기 위한 것이다.
     lum = rgb.mean(-1)
-    keep = np.clip((1.0 - (lum - 150) / 60), 0, 1) * (alpha / 255)
+    keep = np.clip((225 - lum) / 30, 0, 1) * (alpha / 255)
     out = np.zeros_like(a); out[..., 3] = keep * 255
     return Image.fromarray(out.astype('uint8'), 'RGBA')
 
