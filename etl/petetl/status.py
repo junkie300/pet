@@ -191,8 +191,10 @@ def _next_steps(client) -> list[str]:
         steps.append("  · python run.py localdata       (자치단체코드가 빈 행이 있다)")
     if not _places_count(client, category="hospital"):
         steps.append("  · python run.py hospitals       (동물병원이 아직 없다)")
+    if not _places_count(client, category="grooming"):
+        steps.append("  · python run.py grooming        (미용시설이 아직 없다)")
 
     if not steps:
-        steps.append("  · ETL 은 할 일이 없다. 1단계 앱 화면은 다 찼다 (D-91·D-92 는 실기기 확인만 남았다)")
-        steps.append("  · 2단계(미용)는 공공데이터포털 15154944 활용신청(자동승인)이면 시작할 수 있다 (D-93)")
+        steps.append("  · ETL 은 할 일이 없다. 1·2단계 적재가 다 찼다")
+        steps.append("  · 남은 판단은 정기 실행(cron)을 켤지뿐이다 — 켜면 매일 운영 DB 에 쓴다 (D-94)")
     return steps

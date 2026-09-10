@@ -8,6 +8,7 @@
     python run.py coords --limit 50              # 읍면동 중심좌표 (빈 곳만, 50개씩)
     python run.py localdata --dry-run           # LOCALDATA 자치단체코드 매핑 (인증키 불필요)
     python run.py hospitals --limit 200 --dry-run  # 동물병원 변환 결과만 확인
+    python run.py grooming  --limit 200 --dry-run  # 동물미용업 (2단계) 변환 결과만 확인
     python run.py status                         # 지금 어디까지 왔는지 (작업 재개 시 첫 명령)
 """
 
@@ -20,7 +21,7 @@ from pathlib import Path
 
 from petetl.config import ConfigError
 from petetl.sanity import SanityError
-from petetl.sources import coords, hospitals, localdata, mapping, regions
+from petetl.sources import coords, grooming, hospitals, localdata, mapping, regions
 
 
 def _setup_logging() -> None:
@@ -64,6 +65,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_hosp.add_argument("--limit", type=int, default=None, help="앞에서 N건만 처리 (확인용)")
     p_hosp.add_argument("--allow-shrink", action="store_true",
                         help="직전 성공의 절반 밑으로 줄어도 적재한다 (원본이 정말 줄었을 때만)")
+
+    p_groom = sub.add_parser("grooming", help="2단계: 동물미용업 → places (행안부 15154944)")
+    p_groom.add_argument("--dry-run", action="store_true", help="DB 에 쓰지 않고 결과만 확인")
+    p_groom.add_argument("--limit", type=int, default=None, help="앞에서 N건만 처리 (확인용)")
+    p_groom.add_argument("--allow-shrink", action="store_true",
+                         help="직전 성공의 절반 밑으로 줄어도 적재한다 (원본이 정말 줄었을 때만)")
 
     sub.add_parser("status", help="지금 어디까지 왔는지 한 화면에 출력 (작업 재개용)")
 
@@ -121,6 +128,12 @@ def main() -> int:
 
         hospitals.run(client=get_client(), dry_run=args.dry_run, limit=args.limit,
                       allow_shrink=args.allow_shrink)
+
+    elif args.command == "grooming":
+        from petetl.db import get_client
+
+        grooming.run(client=get_client(), dry_run=args.dry_run, limit=args.limit,
+                     allow_shrink=args.allow_shrink)
 
     elif args.command == "status":
         from petetl.db import get_client

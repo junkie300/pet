@@ -1,6 +1,6 @@
 name: etl
 
-# 지금 돌릴 수 있는 것: mapping, coords, hospitals (전부 수동 실행)
+# 지금 돌릴 수 있는 것: mapping, coords, hospitals, grooming (전부 수동 실행)
 #
 # regions 는 법정동코드 파일(etl/data/, 커밋 제외)이 필요하므로 로컬에서만 돌린다.
 # localdata(자치단체코드)는 etl/docs/ 엑셀을 읽고 이미 다 찼다 — 여기서 돌릴 일이 없다.
@@ -21,6 +21,7 @@ on:
           - mapping     # regions 에 APMS·TourAPI 지역코드 매핑 (DATA_GO_KR_KEY 필요)
           - coords      # 읍면동 중심좌표 (KAKAO_REST_API_KEY 필요)
           - hospitals   # 동물병원 → places (DATA_GO_KR_KEY + KAKAO_REST_API_KEY, 약 10분)
+          - grooming    # 미용시설 → places (같은 키, 약 15분 — D-95)
       dry_run:
         description: DB 에 쓰지 않고 결과만 확인
         required: false

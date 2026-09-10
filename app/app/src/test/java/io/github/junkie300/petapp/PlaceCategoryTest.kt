@@ -35,7 +35,10 @@ class PlaceCategoryTest {
      */
     @Test
     fun `적재된 카테고리만 조회 대상이다`() {
-        assertEquals(listOf(PlaceCategory.HOSPITAL), PlaceCategory.loadedEntries)
+        assertEquals(
+            listOf(PlaceCategory.HOSPITAL, PlaceCategory.GROOMING),
+            PlaceCategory.loadedEntries,
+        )
         assertTrue(PlaceCategory.entries.filterNot { it.loaded }.isNotEmpty())
     }
 }

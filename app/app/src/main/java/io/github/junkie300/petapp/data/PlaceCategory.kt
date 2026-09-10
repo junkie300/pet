@@ -17,7 +17,7 @@ enum class PlaceCategory(val dbValue: String, val loaded: Boolean) {
     //
     // 단계별 ETL 이 끝나면 여기 한 줄만 true 로 바꾼다.
     HOSPITAL("hospital", loaded = true),                 // 1단계 — 10,617건 적재 완료
-    GROOMING("grooming", loaded = false),                // 2단계 — LOCALDATA 인증키 대기
+    GROOMING("grooming", loaded = true),                 // 2단계 — 16,160건 적재 완료 (D-95)
     RESTAURANT("restaurant", loaded = false),            // 3단계
     TOUR("tour", loaded = false),                        // 4단계
     WILDLIFE_CENTER("wildlife_center", loaded = false),  // 5단계

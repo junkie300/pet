@@ -88,10 +88,13 @@ class HomeViewModelTest {
         assertEquals(PlaceCategory.entries.size, HomeCategory.entries.count { it.place != null })
     }
 
-    /** 지금 건수를 보여줄 수 있는 칸은 동물병원뿐이다. 나머지는 "준비 중"이다. */
+    /** 지금 건수를 보여줄 수 있는 칸은 동물병원·미용이다. 나머지는 "준비 중"이다. */
     @Test
     fun `적재된 칸만 누를 수 있다`() {
-        assertEquals(listOf(HomeCategory.HOSPITAL), HomeCategory.entries.filter { it.loaded })
+        assertEquals(
+            listOf(HomeCategory.HOSPITAL, HomeCategory.GROOMING),
+            HomeCategory.entries.filter { it.loaded },
+        )
         assertEquals(HomeCategory.HOSPITAL, HomeCategory.of(PlaceCategory.HOSPITAL))
     }
 }

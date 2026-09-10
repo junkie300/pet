@@ -173,8 +173,8 @@ class HospitalsWiringTest(unittest.TestCase):
 
         self.hospitals = hospitals
         self._saved = (hospitals.fetch_all, hospitals.build_places, hospitals.load_data_go_kr_key)
-        hospitals.fetch_all = lambda key, limit=None: []
-        hospitals.build_places = lambda client, items_, kakao: ([], {})
+        hospitals.fetch_all = lambda key, limit=None, ds=None: []
+        hospitals.build_places = lambda client, items_, kakao, ds=None: ([], {})
         hospitals.load_data_go_kr_key = lambda: "테스트키"
 
     def tearDown(self):

@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .. import publicapi
@@ -36,6 +37,31 @@ CATEGORY = "hospital"
 
 URL = "https://apis.data.go.kr/1741000/animal_hospitals/info"
 ROWS_PER_PAGE = 100  # 1000 을 넣어도 100 으로 잘린다 (실측).
+
+
+@dataclass(frozen=True)
+class Dataset:
+    """인허가 데이터 한 종류. **이 파일에서 소스마다 다른 것은 이것뿐이다.**
+
+    2단계(미용)가 `plan.md` 에 걸어 둔 시험이 이것이다 — 형제 서비스가 늘어날 때
+    변환 코드를 베끼지 않고 **설정 한 덩어리**만 더할 수 있어야 한다 (D-95).
+    """
+
+    sync_source: str   # sync_logs.source — 어떤 ETL 이 돌았는지 구분한다
+    dataset: str       # 공공데이터포털 데이터셋 번호. places.extra 에 남는다
+    category: str      # places.category
+    url: str
+    geocode_coords: bool = True
+    """좌표가 빈 행을 **주소로 지오코딩해 채울 것인가.**
+
+    ⚠️ 주소가 온전할 때만 참이다. 미용업은 번지가 `***` 로 가려져 와서(D-95),
+    카카오에 물으면 잘해야 **읍면동 중심**이 돌아온다. 그것을 가게 좌표라고 적으면
+    없는 정밀도를 지어내는 것이다 — 지도에 찍힌 핀은 "여기 있다"는 뜻이기 때문이다.
+    좌표 없이 두면 목록·상세에는 그대로 나오고 지도에만 안 뜬다.
+    """
+
+
+HOSPITAL = Dataset(sync_source=SYNC_SOURCE, dataset=DATASET, category=CATEGORY, url=URL)
 
 # LOCALDATA 평면직각좌표. 반드시 5174 다 — 2097 은 겉보기엔 비슷하지만 321m 어긋난다.
 SOURCE_CRS = "EPSG:5174"
@@ -153,13 +179,24 @@ def lookup_kakao(
     return region_code, latlng
 
 
+def reverse_lookup_kakao(
+    latlng: tuple[float, float], codes: set[str], kakao_key: str
+) -> str | None:
+    """좌표로 법정동코드를 찾는다. 우리 `regions` 에 없는 코드면 버린다."""
+    from .coords import coord_to_bcode
+
+    b_code = coord_to_bcode(kakao_key, latlng[0], latlng[1])
+    return b_code if b_code and b_code in codes else None
+
+
 # --- 변환 -------------------------------------------------------------------
 
-def to_place(item: dict, region_code: str | None, latlng: tuple[float, float] | None) -> dict:
+def to_place(item: dict, region_code: str | None, latlng: tuple[float, float] | None,
+             ds: Dataset = HOSPITAL) -> dict:
     lat, lng = latlng if latlng else (None, None)
     status_code = (item.get("SALS_STTS_CD") or "").strip()
     return {
-        "category": CATEGORY,
+        "category": ds.category,
         "source": SOURCE,
         "source_id": (item.get("MNG_NO") or "").strip(),
         "name": (item.get("BPLC_NM") or "").strip(),
@@ -172,7 +209,7 @@ def to_place(item: dict, region_code: str | None, latlng: tuple[float, float] | 
         # 모르는 코드를 open 으로 두면 폐업이 지도에 남는다. 모르면 닫힌 것으로 본다.
         "status": STATUS_MAP.get(status_code, "closed"),
         "extra": {
-            "dataset": DATASET,
+            "dataset": ds.dataset,
             "sales_status": (item.get("SALS_STTS_NM") or "").strip(),
             "detail_status": (item.get("DTL_SALS_STTS_NM") or "").strip(),
             "license_date": (item.get("LCPMT_YMD") or "").strip(),
@@ -200,12 +237,12 @@ def _to_timestamp(value: str | None) -> str | None:
 
 # --- 수집 -------------------------------------------------------------------
 
-def fetch_all(key: str, limit: int | None = None) -> list[dict]:
+def fetch_all(key: str, limit: int | None = None, ds: Dataset = HOSPITAL) -> list[dict]:
     """전체 목록을 페이지 단위로 받는다."""
     rows: list[dict] = []
     page = 1
     while True:
-        body = publicapi.get(URL, key, pageNo=page, numOfRows=ROWS_PER_PAGE, returnType="json")
+        body = publicapi.get(ds.url, key, pageNo=page, numOfRows=ROWS_PER_PAGE, returnType="json")
         batch = publicapi.items(body)
         rows.extend(batch)
         total = int(body.get("totalCount") or 0)
@@ -222,14 +259,15 @@ def fetch_all(key: str, limit: int | None = None) -> list[dict]:
 
 # --- 실행 -------------------------------------------------------------------
 
-def build_places(client, items_: list[dict], kakao_key: str | None) -> tuple[list[dict], dict]:
+def build_places(client, items_: list[dict], kakao_key: str | None,
+                 ds: Dataset = HOSPITAL) -> tuple[list[dict], dict]:
     index = build_region_index(client)
     codes = set(index.values())
     transformer = make_transformer()
 
     places: list[dict] = []
     stats = {
-        "지역 이름매칭": 0, "지역 카카오보완": 0, "지역 미배정": 0,
+        "지역 이름매칭": 0, "지역 좌표역추적": 0, "지역 카카오보완": 0, "지역 미배정": 0,
         "좌표 원본": 0, "좌표 카카오보완": 0, "좌표 없음": 0,
         "폐업·휴업": 0, "영업중인데 지역 미배정": 0,
     }
@@ -246,13 +284,31 @@ def build_places(client, items_: list[dict], kakao_key: str | None) -> tuple[lis
             stats["좌표 원본"] += 1
 
         # 지역이든 좌표든 빠진 게 있으면 카카오에 한 번만 물어 둘 다 채운다.
+        # ⚠️ 좌표를 채우는 것은 `ds.geocode_coords` 가 참일 때뿐이다 — 주소가 가려진
+        #    소스에서는 읍면동 중심이 돌아오고, 그것을 가게 좌표로 적으면 거짓말이 된다.
         road = (item.get("ROAD_NM_ADDR") or "").strip().split(",")[0]
-        if (region_code is None or latlng is None) and (address or road) and kakao_key:
-            found_code, found_latlng = lookup_kakao([address, road], codes, kakao_key)
+        wants_coords = latlng is None and ds.geocode_coords
+
+        # ① 좌표가 있으면 **좌표가 정답이다.** 주소가 가려져 있어도 정확한 법정동이 나온다.
+        #    이름으로 못 맞추는 `평화동*가` 류를 여기서 건진다 — 추측이 아니라 조회다 (D-95).
+        if region_code is None and latlng is not None and kakao_key:
+            found_code = reverse_lookup_kakao(latlng, codes, kakao_key)
+            if found_code:
+                region_code = found_code
+                stats["지역 좌표역추적"] += 1
+
+        # ② 그래도 없거나 좌표를 채워야 하면 주소로 묻는다.
+        #    ⚠️ 좌표를 채우는 것은 `ds.geocode_coords` 가 참일 때뿐이다 — 주소가 가려진
+        #    소스에서는 읍면동 중심이 돌아오고, 그것을 가게 좌표로 적으면 거짓말이 된다.
+        # ⚠️ **가려진 주소는 묻지 않는다.** 카카오는 `평화동*가 ***-*` 에 0건을 돌려준다
+        #    (실측). 지어내지 않는 것은 다행이지만, 물어봐야 답이 없으므로 호출만 버린다.
+        queries = [q for q in (address, road) if q and "*" not in q]
+        if (region_code is None or wants_coords) and queries and kakao_key:
+            found_code, found_latlng = lookup_kakao(queries, codes, kakao_key)
             if region_code is None and found_code:
                 region_code = found_code
                 stats["지역 카카오보완"] += 1
-            if latlng is None and found_latlng:
+            if wants_coords and found_latlng:
                 latlng = found_latlng
                 stats["좌표 카카오보완"] += 1
 
@@ -263,7 +319,7 @@ def build_places(client, items_: list[dict], kakao_key: str | None) -> tuple[lis
         if latlng is None:
             stats["좌표 없음"] += 1
 
-        place = to_place(item, region_code, latlng)
+        place = to_place(item, region_code, latlng, ds)
         if place["status"] != "open":
             stats["폐업·휴업"] += 1
         elif region_code is None:
@@ -281,9 +337,9 @@ def build_places(client, items_: list[dict], kakao_key: str | None) -> tuple[lis
 
 
 def run(client=None, dry_run: bool = False, limit: int | None = None,
-        allow_shrink: bool = False) -> list[dict]:
+        allow_shrink: bool = False, ds: Dataset = HOSPITAL) -> list[dict]:
     if client is None:
-        raise RuntimeError("hospitals 는 regions 를 읽어야 하므로 DB 연결이 필요합니다.")
+        raise RuntimeError(f"{ds.category} 는 regions 를 읽어야 하므로 DB 연결이 필요합니다.")
 
     key = load_data_go_kr_key()
     try:
@@ -293,9 +349,11 @@ def run(client=None, dry_run: bool = False, limit: int | None = None,
     except Exception:  # 카카오 키가 없어도 이름 매칭만으로 99% 는 배정된다
         kakao_key = None
         log.warning("카카오 키가 없어 폐지된 법정동 주소는 배정하지 못합니다.")
+    if not ds.geocode_coords:
+        log.info("%s: 주소가 가려진 소스라 좌표 지오코딩은 하지 않습니다 (D-95).", ds.category)
 
-    items_ = fetch_all(key, limit=limit)
-    places, stats = build_places(client, items_, kakao_key)
+    items_ = fetch_all(key, limit=limit, ds=ds)
+    places, stats = build_places(client, items_, kakao_key, ds=ds)
 
     log.info("변환 %d건 — %s", len(places), " · ".join(f"{k} {v}" for k, v in stats.items()))
 
@@ -303,10 +361,10 @@ def run(client=None, dry_run: bool = False, limit: int | None = None,
         log.info("dry-run: DB 에 쓰지 않고 종료합니다.")
         return places
 
-    with SyncRun(client, SYNC_SOURCE) as run_log:
+    with SyncRun(client, ds.sync_source) as run_log:
         # --limit 는 확인용으로 일부러 적게 받는 것이라 증감 비교의 대상이 아니다.
         if limit is None:
-            guard(client, SYNC_SOURCE, len(places), allow_shrink=allow_shrink)
+            guard(client, ds.sync_source, len(places), allow_shrink=allow_shrink)
         run_log.add(upsert(client, TABLE, places, on_conflict="source,source_id", chunk_size=PAGE // 2))
         log.info("총 %d행 반영", run_log.rows_upserted)
     return places

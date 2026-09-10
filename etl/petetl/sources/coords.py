@@ -153,6 +153,43 @@ def search_address(key: str, query: str) -> list[dict]:
     return []
 
 
+COORD2REGION_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json"
+
+
+def coord_to_bcode(key: str, lat: float, lng: float) -> str | None:
+    """좌표 -> 법정동코드. 못 찾으면 None.
+
+    **주소가 가려진 데이터의 마지막 수단이다** (D-95). 인허가 주소는 번지가 `***` 로
+    가려져 오는 경우가 있는데(미용업은 100%), 하필 `평화동*가` 처럼 **동 이름 속 숫자까지**
+    가려지면 이름으로는 영영 못 맞춘다 — 1가~4가 중 무엇인지 알 길이 없기 때문이다.
+
+    그런데 **좌표는 가려지지 않는다.** 좌표가 있으면 그것이 정답이다. 이것은 추측이 아니라
+    조회다 — 카카오가 그 점을 품는 법정동을 그대로 돌려준다 (실측: `평화동*가` → `평화동1가`).
+    """
+    import requests
+
+    headers = {"Authorization": f"KakaoAK {key}"}
+    for attempt in range(1, RETRIES + 1):
+        response = requests.get(
+            COORD2REGION_URL, headers=headers, params={"x": lng, "y": lat}, timeout=TIMEOUT
+        )
+        if response.status_code == 429:
+            wait = 2 * attempt
+            log.warning("  429 — %d초 대기 후 재시도 (역지오코딩)", wait)
+            time.sleep(wait)
+            continue
+        if response.status_code == 401:
+            raise RuntimeError("카카오 REST API 키가 거부되었습니다(401).")
+        if response.status_code != 200:
+            return None
+        for document in response.json().get("documents") or []:
+            # 'B' 가 법정동, 'H' 는 행정동이다. 우리 regions 는 법정동 기준이다.
+            if document.get("region_type") == "B" and document.get("code"):
+                return document["code"]
+        return None
+    return None
+
+
 def resolve(key: str, region: dict) -> tuple[float, float] | None:
     for query in query_candidates(region):
         documents = search_address(key, query)
