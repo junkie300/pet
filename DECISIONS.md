@@ -2336,3 +2336,31 @@ D-86 실측에서 남은 것 — 자양동의 `로얄동물병원 · 자양동�
 판별기(400=없음 / 403=미신청)로 **미용 이름 후보 8개를 더 물어 전부 400** 임을 확인했다
 (`animal_grooming` · `animal_beauty` · `pet_beauty` · `animal_salon` …). **`pet_grooming` 이 유일하다.**
 동물병원의 진짜 이름이 `animal_hospitals` 라서 `animal_*` 쪽을 의심했는데 아니었다.
+
+**덧 (2026-09-10 저녁) — 밀어 올렸고, 알림이 도는 것을 봤다.**
+
+- `github.com/junkie300/pet` **공개**로 올렸다. 공개를 고른 이유는 Actions 가 무료라서만이 아니다 —
+  개인정보처리방침을 **GitHub Pages 로 무료 게시**하려면 무료 요금제에선 public 이어야 한다
+  (`plan.md` ★ MVP 항목). 이미 `junkie300/saju-privacy` 를 그렇게 쓰고 있다.
+- ⚠️ **푸시가 한 번 거절됐다** — OAuth 토큰에 `workflow` 스코프가 없으면 `.github/workflows/` 가
+  든 커밋을 밀 수 없다. `gh auth refresh -s workflow` 로 푼다. 그리고 그때 **브라우저가 다른
+  계정(`junkie300-ltw`)으로 로그인돼 있으면 승인해도 거절된다** — `gh` 쪽 계정과 맞춰야 한다.
+- Secrets 4개를 넣었다(`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`DATA_GO_KR_KEY`·
+  `KAKAO_REST_API_KEY`). 이제 **수동 실행이 바로 된다.**
+
+**알림은 일회용 브랜치에서 일부러 실패시켜 확인했다.** `main` 을 더럽히지 않으려고 그렇게 했다.
+
+- ① 이슈 `ETL 실패: hospitals` 가 열린다 · ② **두 번째 실패는 같은 이슈에 댓글로 붙는다**
+  (새 이슈가 안 생긴다) · ③ 본문의 실행 링크·백틱이 제대로 렌더된다. 확인 후 브랜치를 지우고
+  이슈를 닫았다. **이제 "한 번도 안 돌아본 알림"이 아니다.**
+
+⚠️ **그리고 첫 CI 가 곧바로 고장 하나를 찾아냈다.** `test.yml` 에 "테스트는 표준 라이브러리만
+쓰므로 의존성 설치가 필요 없다"고 적혀 있었는데 **사실이 아니었다** — `test_hospitals` 가
+`pyproj` 를, `test_localdata` 가 `openpyxl` 을 import 한다. 6개가 `ModuleNotFoundError` 로 깨졌다.
+`pip install -r requirements.txt` 를 넣어 고쳤고 지금은 초록이다.
+
+- → **이것이 D-94 의 요점을 그대로 되풀이한다.** 돌지 않는 검사는 통과하는 검사가 아니다.
+  워크플로는 2026-08 부터 저장소에 있었지만 **한 번도 실행된 적이 없어** 틀린 주석이 사실처럼
+  남아 있었다. `android` 잡은 첫 실행에서 그대로 통과했다(단위 테스트 + `assembleDebug`).
+- → 남은 경고: 액션들이 **Node 20 폐기** 대상이다(지금은 강제로 Node 24 에서 돌아 통과한다).
+  `setup-java@v4` 도 폐기 예고다. 급하지 않지만 언젠가 올려야 한다 — README §5 에 적어 두었다.
