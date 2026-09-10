@@ -22,7 +22,10 @@ object PlaceActions {
 
     /**
      * 카카오맵 길찾기. 앱이 깔려 있으면 앱이 받고, 없으면 웹 지도가 연다.
-     * 좌표가 없는 장소가 있으므로(전체의 0.1%) 호출 전에 [Place.hasCoordinates] 를 본다.
+     * 좌표가 없는 장소가 있으므로 호출 전에 [Place.hasCoordinates] 를 본다 — 상세 화면도
+     * 그때는 버튼 자체를 그리지 않는다. 2단계 미용이 들어오며 **전체의 1.9%** 로 늘었다
+     * (병원 4건 · 미용 508건 — 미용은 주소가 가려져 와 지오코딩을 안 하기 때문이다 · D-95).
+     * ⚠️ 넘기는 것은 **좌표**다. 그래서 미용의 가려진 주소(`연남로 **`)와 무관하게 정확히 연다.
      */
     fun route(context: Context, place: Place): Boolean {
         val lat = place.lat ?: return false
