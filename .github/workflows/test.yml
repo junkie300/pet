@@ -23,7 +23,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # 테스트는 표준 라이브러리만 쓰므로 의존성 설치가 필요 없다.
+          cache: pip
+          cache-dependency-path: etl/requirements.txt
+      # ⚠️ 한때 "표준 라이브러리만 쓰므로 설치가 필요 없다"고 적혀 있었는데 **사실이 아니었다.**
+      #    test_hospitals 는 pyproj 를, test_localdata 는 openpyxl 을 import 한다.
+      #    워크플로가 한 번도 돈 적이 없어서(D-94) 아무도 몰랐다 — 첫 실행에서 6개가 깨졌다.
+      - run: pip install -r requirements.txt
       - name: unittest
         run: python -m unittest discover -s tests -v
 
