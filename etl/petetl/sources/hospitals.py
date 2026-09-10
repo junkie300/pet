@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from .. import publicapi
 from ..config import load_data_go_kr_key
 from ..db import upsert
+from ..sanity import guard
 from ..synclog import SyncRun
 from .mapping import PAGE, select_all
 
@@ -279,7 +280,8 @@ def build_places(client, items_: list[dict], kakao_key: str | None) -> tuple[lis
     return places, stats
 
 
-def run(client=None, dry_run: bool = False, limit: int | None = None) -> list[dict]:
+def run(client=None, dry_run: bool = False, limit: int | None = None,
+        allow_shrink: bool = False) -> list[dict]:
     if client is None:
         raise RuntimeError("hospitals 는 regions 를 읽어야 하므로 DB 연결이 필요합니다.")
 
@@ -302,6 +304,9 @@ def run(client=None, dry_run: bool = False, limit: int | None = None) -> list[di
         return places
 
     with SyncRun(client, SYNC_SOURCE) as run_log:
+        # --limit 는 확인용으로 일부러 적게 받는 것이라 증감 비교의 대상이 아니다.
+        if limit is None:
+            guard(client, SYNC_SOURCE, len(places), allow_shrink=allow_shrink)
         run_log.add(upsert(client, TABLE, places, on_conflict="source,source_id", chunk_size=PAGE // 2))
         log.info("총 %d행 반영", run_log.rows_upserted)
     return places

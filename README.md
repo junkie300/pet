@@ -26,6 +26,7 @@ etl/                   공공데이터 → Supabase 파이썬 ETL   → etl/READ
   run.py                 진입점 (status · regions · mapping · coords · localdata · hospitals)
   petetl/status.py       "지금 어디까지 왔나" 요약
   petetl/publicapi.py    공공데이터포털 공통 클라이언트
+  petetl/sanity.py       적재 직전 안전장치 — **0건·급감이면 터뜨린다**. cron 의 안전벨트 — D-94
   petetl/sources/        소스별 ETL
 app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.md
   gradle/libs.versions.toml   의존성 버전은 전부 여기서만 바꾼다
@@ -58,7 +59,8 @@ app/                   안드로이드 앱 (Kotlin + Compose)   → app/README.m
   app/src/main/assets/licenses SIL OFL 1.1 전문 (서체와 함께 배포해야 한다)
 tools/
   make_launcher_icon.py  시안 PNG 한 장 → 런처 아이콘 레이어 밀도별로 다시 생성 — D-77
-.github/workflows/     test.yml · etl.yml(mapping·coords 수동 실행 가능)
+.github/workflows/     test.yml · etl.yml(수동 실행 + 실패 시 이슈 알림 — D-94)
+                       ⚠️ **원격 저장소가 없어 아직 한 번도 돈 적이 없다** (D-94)
 ```
 
 ---
@@ -259,7 +261,7 @@ python run.py status
 최근 ETL 이력 · 다음에 칠 명령을 한 화면에 보여준다.
 
 ```
-python -m unittest discover -s tests    # 72개 통과해야 함 (네트워크·DB 불필요)
+python -m unittest discover -s tests    # 88개 통과해야 함 (네트워크·DB 불필요)
 ```
 
 DB 를 더 자세히 보려면 Supabase SQL Editor 에 `supabase/verify.sql` 을 붙여넣는다.
@@ -302,16 +304,22 @@ gradlew installDebug          # 에뮬레이터/기기에 설치
 | `python run.py localdata` | 개방자치단체코드 매핑 (다 찼다 · D-93) | **없음** (`etl/docs/` 엑셀) |
 | `python run.py hospitals` | 동물병원 → `places` (10,617건, 약 10분) | `DATA_GO_KR_KEY` + `KAKAO_REST_API_KEY` |
 
-`--dry-run` 을 붙이면 DB 에 쓰지 않는다. `mapping`·`coords`·`hospitals` 는 GitHub Actions
+`--dry-run` 을 붙이면 DB 에 쓰지 않는다. `hospitals` 는 적재 직전에 건수를 검사해서 **0건이거나
+직전 성공의 절반 밑이면 터진다** (D-94). 원본이 정말 줄었다면 `--allow-shrink` 를 붙인다. `mapping`·`coords`·`hospitals` 는 GitHub Actions
 (`.github/workflows/etl.yml`)에서 수동 실행할 수도 있다 — Secrets 에 같은 이름으로 넣어둘 것.
-⚠️ **정기 실행(cron)은 꺼 두었다.** 켜면 매일 운영 DB 에 쓰므로 사람이 정한다 (§4 A-2).
+⚠️ **정기 실행(cron)은 꺼 두었다.** 켜면 매일 운영 DB 에 쓰므로 사람이 정한다 (§4 A-3).
+⚠️ **그리고 아직 아무것도 안 돈다** — 원격 저장소가 없다 (§4 A-2 · D-94).
 
 ### 4. 다음에 할 일
 
 **1단계의 만드는 일은 끝났다 (2026-09-09).** `spec.md §5.2` 가 요구한 화면이 다 찼고 —
 지도(S-02)에 이어 S-01 의 마지막 한 줄인 **「현재 위치로」**(D-91), 이름 겹침(D-92)까지 —
-ETL 도 동물병원 10,617행을 싣고 돈다. **남은 두 칸은 운영 쪽**이다: 정기 실행(cron)을 켤지와
-실패 알림(A-2). 무엇을 왜 그렇게 정했는지는 `DECISIONS.md` §49~§56.
+ETL 도 동물병원 10,617행을 싣고 돈다. **남은 것은 운영 쪽**이다 — **실패 알림은 붙였고**(D-94),
+남은 것은 **저장소를 밀어 올리는 것**(A-2)과 **cron 을 켤지**(A-3)다.
+무엇을 왜 그렇게 정했는지는 `DECISIONS.md` §49~§57.
+
+⚠️ **알림을 붙이며 알게 된 것** — `git remote` 가 비어 있다. **워크플로가 한 번도 돈 적이 없다**
+(D-94). 그래서 A-2 가 새로 맨 앞에 왔다.
 
 **그리고 기다리던 것 하나가 사라졌다** — LOCALDATA 사이트가 **2026-04-16 에 닫혔다** (D-93).
 2단계는 이제 **이미 가진 `DATA_GO_KR_KEY`** 로 연다. 남은 것은 활용신청 한 번(자동승인)뿐이다.
@@ -321,7 +329,8 @@ ETL 도 동물병원 10,617행을 싣고 돈다. **남은 두 칸은 운영 쪽*
 | | 상태 |
 |---|---|
 | 앱 (1단계 화면 전부) | ✅ 다 찼다. 단위 테스트 72개(앱)+72개(ETL) · **실기기 확인 2건 남음**(B) |
-| ETL (동물병원) | ✅ 10,617행 · 영업중 5,474. cron 은 **일부러 꺼 두었다**(아래 A-2) |
+| ETL (동물병원) | ✅ 10,617행 · 영업중 5,474. cron 은 **일부러 꺼 두었다**(아래 A-3) |
+| GitHub Actions | ❌ **원격 저장소가 없어 한 번도 돈 적이 없다** — A-2 (D-94) |
 | 2단계 (미용) | ⏸ 활용신청 한 번이면 시작 — **더 기다릴 것이 없다**(아래 C-1) |
 | 출시 준비 | ⏸ 테스터 12명이 리드타임 최장 (`plan.md` §3) |
 
@@ -338,12 +347,26 @@ ETL 도 동물병원 10,617행을 싣고 돈다. **남은 두 칸은 운영 쪽*
    · 붙일 자리: `etl/petetl/sources/hospitals.py` 를 **엔드포인트·카테고리만 바꿔** 재사용하고
      (`category='grooming'`), 앱은 `PlaceCategory` 의 칩 하나다. 그 이상 손대면 신호다
    · 이때 클러스터링(④)이 강남·서초에서 **처음으로 실데이터로 문턱을 넘는다** (D-83)
-2. **ETL 정기 실행(cron)을 켤지 정한다** — 워크플로에서 `hospitals` 를 **수동으로는** 돌릴 수
+2. ⚠️ **저장소를 GitHub 에 밀어 올린다** ← **A-2 의 나머지가 전부 여기에 걸려 있다** (D-94)
+   `git remote` 가 **비어 있다.** 커밋이 전부 로컬이라 **`.github/workflows/` 는 한 번도 돈 적이
+   없다** — cron 도 실패 알림도 `test.yml` 도 종이 위의 것이다. `plan.md` 의 `[x] GitHub 저장소
+   생성` 은 사실이 아니었고 `[◐]` 로 되돌렸다
+   · **막을 것은 없다.** `.env` · `local.properties` · `이태우메모(건드리지말것).txt` 는 전부
+     `.gitignore` 에 있고 **전체 이력에 실제 키가 한 건도 없다** (2026-09-10 확인)
+   · 공개/비공개는 **사람이 정한다.** 공개면 Actions 가 무료(`plan.md §5` 의 전제), 비공개면
+     월 2,000분인데 `hospitals` 가 10분이라 매일 돌려도 300분 — 둘 다 든다
+   · 밀어 올린 뒤 **Secrets 4개**를 넣는다: `SUPABASE_URL` · `SUPABASE_SERVICE_ROLE_KEY` ·
+     `DATA_GO_KR_KEY` · `KAKAO_REST_API_KEY` (`etl/.env` 와 **같은 이름·같은 값**)
+3. **ETL 정기 실행(cron)을 켤지 정한다** — 워크플로에서 `hospitals` 를 **수동으로는** 돌릴 수
    있게 해 두었다. `schedule` 은 **일부러 주석**이다 (`.github/workflows/etl.yml`)
    · 켜면 매일 20:30 KST 에 **운영 DB 로 쓴다.** 사람이 정할 일이라 코드가 정하지 않았다
-   · 함께 남은 것: **실패 알림.** 실패가 `sync_logs` 에만 남으면 며칠씩 모른 채 지나간다
+   · **실패 알림은 붙였다** (D-94) — 실패하면 `ETL 실패: <source>` 이슈가 열리고, 이미 열려
+     있으면 **댓글로 모인다**(매일 실패해도 이슈가 쌓이지 않는다). 수동 실행에도 켜 두었으니
+     **cron 을 켜기 전에 한 번 일부러 실패시켜 보는 것**으로 확인한다
+   · 함께 막은 것: **"성공했다는 거짓말".** upsert 는 지우지 않으므로 원본이 0건을 줘도 조용히
+     success 가 찍히고 앱이 낡은 데이터에 오늘 날짜를 붙인다 → `petetl/sanity.py` 가 터뜨린다
 
-> 지난번 A-3 이던 **이름 겹침은 고쳤다** (D-92). 의심하던 곳이 아니라 **경쟁에 순서가 없어서**
+> 지난번 목록에 있던 **이름 겹침은 고쳤다** (D-92). 의심하던 곳이 아니라 **경쟁에 순서가 없어서**
 > 였다 — `LabelOptions.rank` 가 전부 0. 이제 눈으로 볼 것만 남아 아래 B 로 내려갔다.
 
 #### B. 다음에 폰을 꽂았을 때 볼 것
